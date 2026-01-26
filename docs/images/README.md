@@ -14,7 +14,9 @@ Please capture the following screenshots from a running AgentKit instance:
 | `admin-models.png` | Model configuration panel | 1200×800px |
 | `admin-graph.png` | 3D knowledge graph visualization | 1200×800px |
 | `admin-etl.png` | ETL jobs list and pipeline view | 1200×800px |
-| `admin-observability.png` | Usage analytics and observability dashboard | 1200×800px |
+| `admin-observability.png` | Observability overview with stats and mode distribution | 1200×800px |
+| `admin-observability-quality.png` | Quality metrics tab with trends and radar chart | 1200×800px |
+| `admin-observability-users.png` | User activity tab with session drill-down | 1200×800px |
 | `chat-modes.png` | Mode dropdown selector | 600×400px |
 | `reasoning-pane.png` | Reasoning/trace pane expanded | 800×600px |
 

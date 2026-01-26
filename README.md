@@ -155,10 +155,24 @@ Self-learning pipelines with Plan-Act-Reflect (PAR) loop for reliable data inges
 
 ### Usage Analytics & Observability
 
-Monitor user engagement, question patterns, response quality, and system performance.
+Comprehensive observability dashboard for monitoring your AI assistant's performance and usage patterns.
+
+**Overview Dashboard** — Real-time stats on sessions, messages, quality scores, and mode distribution across quick, think, deep, and research modes.
 
 <p align="center">
-  <img src="docs/images/admin-observability.png" alt="Observability Dashboard" width="800">
+  <img src="docs/images/admin-observability.png" alt="Observability Overview" width="800">
+</p>
+
+**Quality Metrics** — Track response quality trends over time with relevance, groundedness, coherence, and completeness scores. Automatic hallucination detection alerts you to potential issues.
+
+<p align="center">
+  <img src="docs/images/admin-observability-quality.png" alt="Quality Metrics" width="800">
+</p>
+
+**User Activity** — Deep dive into individual user sessions, question patterns, and domain agent utilization. Click any user to view their full conversation history with quality evaluations.
+
+<p align="center">
+  <img src="docs/images/admin-observability-users.png" alt="User Activity" width="800">
 </p>
 
 ---
