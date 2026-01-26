@@ -151,10 +151,14 @@ export async function POST(request: NextRequest) {
                     messageId: messageId || null,
                     prompt,
                     revisedPrompt: revisedPrompt || null,
-                    imageUrl: '', // We store base64 instead
+                    imageUrl: '',
+                    imageBase64: finalImageBase64, // Store actual image data for persistence
                     model,
                     size,
                     quality,
+                    background,
+                    action,
+                    durationMs,
                   }).returning();
                   savedImageId = savedImage?.id;
                 } catch (dbError) {
@@ -214,10 +218,14 @@ export async function POST(request: NextRequest) {
               messageId: messageId || null,
               prompt,
               revisedPrompt: result.revisedPrompt || null,
-              imageUrl: '', // We store base64 instead
+              imageUrl: '',
+              imageBase64: result.imageBase64, // Store actual image data for persistence
               model,
               size,
               quality,
+              background,
+              action: result.action,
+              durationMs,
             }).returning();
             savedImageId = savedImage?.id;
           } catch (dbError) {

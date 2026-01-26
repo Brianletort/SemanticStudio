@@ -305,6 +305,7 @@ export const generatedImages = pgTable('generated_images', {
   prompt: text('prompt').notNull(),
   revisedPrompt: text('revised_prompt'),
   imageUrl: text('image_url').notNull(),
+  imageBase64: text('image_base64'), // Base64 encoded image data for persistence
   model: text('model').notNull(),
   size: text('size'),
   quality: text('quality'),

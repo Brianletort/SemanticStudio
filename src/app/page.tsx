@@ -98,12 +98,25 @@ export default function ChatPage() {
           content: string;
           metadata: Record<string, unknown>;
           createdAt: string;
+          imageGeneration?: {
+            isGenerating: boolean;
+            progress: number;
+            partialImages: { index: number; imageBase64: string }[];
+            finalImage?: string;
+            revisedPrompt?: string;
+            quality?: string;
+            size?: string;
+            background?: string;
+            durationMs?: number;
+          };
         }) => ({
           id: m.id,
           role: m.role,
           content: m.content,
           timestamp: new Date(m.createdAt),
           attachments: m.metadata?.attachments as FileAttachment[] | undefined,
+          // Restore image generation data if present
+          imageGeneration: m.imageGeneration,
         }));
         setMessages(loadedMessages);
       }
