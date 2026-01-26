@@ -271,71 +271,84 @@ export default function ChatPage() {
           throw new Error("No response body");
         }
 
+        // Buffer for incomplete SSE messages (data can be chunked across reads)
+        let sseBuffer = '';
+        
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n");
+          // Append new chunk to buffer
+          sseBuffer += decoder.decode(value, { stream: true });
+          
+          // Process complete SSE messages (those ending with \n\n)
+          // SSE format: "data: {...}\n\n"
+          const messages = sseBuffer.split('\n\n');
+          
+          // Keep the last part in buffer if it's incomplete (no trailing \n\n)
+          sseBuffer = messages.pop() || '';
 
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              const data = line.slice(6);
-              if (data === "[DONE]") continue;
+          for (const message of messages) {
+            const lines = message.split('\n');
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const data = line.slice(6);
+                if (data === "[DONE]") continue;
 
-              try {
-                const parsed = JSON.parse(data);
-                
-                if (parsed.type === 'partial') {
-                  // Update with partial image
-                  setMessages((prev) =>
-                    prev.map((m) =>
-                      m.id === assistantMessageId
-                        ? {
-                            ...m,
-                            imageGeneration: {
-                              ...m.imageGeneration!,
-                              progress: parsed.progress || 0,
-                              partialImages: [
-                                ...(m.imageGeneration?.partialImages || []),
-                                { index: parsed.partialIndex, imageBase64: parsed.imageBase64 },
-                              ],
-                            },
-                          }
-                        : m
-                    )
-                  );
-                } else if (parsed.type === 'complete') {
-                  // Update with final image
-                  setMessages((prev) =>
-                    prev.map((m) =>
-                      m.id === assistantMessageId
-                        ? {
-                            ...m,
-                            isStreaming: false,
-                            imageGeneration: {
-                              ...m.imageGeneration!,
-                              isGenerating: false,
-                              progress: 100,
-                              finalImage: parsed.imageBase64,
-                              revisedPrompt: parsed.revisedPrompt,
-                              quality: parsed.quality,
-                              size: parsed.size,
-                              background: parsed.background,
-                              durationMs: parsed.durationMs,
-                            },
-                          }
-                        : m
-                    )
-                  );
-                } else if (parsed.type === 'error') {
-                  throw new Error(parsed.error);
-                }
-              } catch (e) {
-                if (e instanceof SyntaxError) {
-                  // Not JSON, ignore
-                } else {
-                  throw e;
+                try {
+                  const parsed = JSON.parse(data);
+                  
+                  if (parsed.type === 'partial') {
+                    // Update with partial image
+                    setMessages((prev) =>
+                      prev.map((m) =>
+                        m.id === assistantMessageId
+                          ? {
+                              ...m,
+                              imageGeneration: {
+                                ...m.imageGeneration!,
+                                progress: parsed.progress || 0,
+                                partialImages: [
+                                  ...(m.imageGeneration?.partialImages || []),
+                                  { index: parsed.partialIndex, imageBase64: parsed.imageBase64 },
+                                ],
+                              },
+                            }
+                          : m
+                      )
+                    );
+                  } else if (parsed.type === 'complete') {
+                    // Update with final image
+                    setMessages((prev) =>
+                      prev.map((m) =>
+                        m.id === assistantMessageId
+                          ? {
+                              ...m,
+                              isStreaming: false,
+                              imageGeneration: {
+                                ...m.imageGeneration!,
+                                isGenerating: false,
+                                progress: 100,
+                                finalImage: parsed.imageBase64,
+                                revisedPrompt: parsed.revisedPrompt,
+                                quality: parsed.quality,
+                                size: parsed.size,
+                                background: parsed.background,
+                                durationMs: parsed.durationMs,
+                              },
+                            }
+                          : m
+                      )
+                    );
+                  } else if (parsed.type === 'error') {
+                    throw new Error(parsed.error);
+                  }
+                } catch (e) {
+                  if (e instanceof SyntaxError) {
+                    // Incomplete JSON, ignore
+                  } else {
+                    throw e;
+                  }
                 }
               }
             }
