@@ -16,11 +16,19 @@ async function wait(ms: number) {
 }
 
 async function main() {
-  console.log('📸 Capturing Observability Dashboard Screenshots\n');
+  console.log('📸 Capturing Observability Dashboard Screenshots (Dark Mode)\n');
   
   const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({ viewport: VIEWPORT });
+  const context = await browser.newContext({ 
+    viewport: VIEWPORT,
+    colorScheme: 'dark'
+  });
   const page = await context.newPage();
+  
+  // Force dark theme via localStorage before navigating
+  await page.addInitScript(() => {
+    localStorage.setItem('theme', 'dark');
+  });
 
   try {
     // Navigate to observability page
