@@ -61,12 +61,22 @@ export type AgentEventType =
   | 'source_used'
   | 'context_built'
   // General logging
-  | 'log';
+  | 'log'
+  // Task agent orchestration
+  | 'task_requested'
+  | 'task_routed'
+  | 'task_pending_approval'
+  | 'task_approved'
+  | 'task_rejected'
+  | 'task_executing'
+  | 'task_result'
+  | 'task_failed';
 
 // Base agent event
 interface BaseAgentEvent {
   runId: string;
   sessionId?: string;  // Optional session ID for historical trace retrieval
+  turnId?: string;     // Links events to specific response for per-turn trace retrieval
   timestamp?: number;
 }
 
@@ -333,6 +343,80 @@ export interface LogEvent extends BaseAgentEvent {
 }
 
 // ============================================
+// TASK AGENT ORCHESTRATION EVENTS
+// ============================================
+
+/** Execution mode for task agents */
+export type TaskExecutionMode = 'human_in_loop' | 'human_out_of_loop';
+
+export interface TaskRequestedEvent extends BaseAgentEvent {
+  type: 'task_requested';
+  taskId: string;
+  taskType: string;
+  agentId?: string;
+  params: Record<string, unknown>;
+  requiresApproval: boolean;
+}
+
+export interface TaskRoutedEvent extends BaseAgentEvent {
+  type: 'task_routed';
+  taskId: string;
+  taskType: string;
+  agentId: string;
+  agentName: string;
+  executionMode: TaskExecutionMode;
+}
+
+export interface TaskPendingApprovalEvent extends BaseAgentEvent {
+  type: 'task_pending_approval';
+  taskId: string;
+  agentId: string;
+  description: string;
+  params: Record<string, unknown>;
+  warnings?: string[];
+}
+
+export interface TaskApprovedEvent extends BaseAgentEvent {
+  type: 'task_approved';
+  taskId: string;
+  agentId: string;
+  approvedBy?: string;
+}
+
+export interface TaskRejectedEvent extends BaseAgentEvent {
+  type: 'task_rejected';
+  taskId: string;
+  agentId: string;
+  rejectedBy?: string;
+  reason?: string;
+}
+
+export interface TaskExecutingEvent extends BaseAgentEvent {
+  type: 'task_executing';
+  taskId: string;
+  agentId: string;
+  estimatedDuration?: string;
+}
+
+export interface TaskResultEvent extends BaseAgentEvent {
+  type: 'task_result';
+  taskId: string;
+  agentId: string;
+  success: boolean;
+  data?: unknown;
+  durationMs: number;
+}
+
+export interface TaskFailedEvent extends BaseAgentEvent {
+  type: 'task_failed';
+  taskId: string;
+  agentId: string;
+  error: string;
+  retriable: boolean;
+  durationMs: number;
+}
+
+// ============================================
 // UNION OF ALL EVENT TYPES
 // ============================================
 
@@ -379,7 +463,16 @@ export type AgentEvent =
   | SourceUsedEvent
   | ContextBuiltEvent
   // Logging
-  | LogEvent;
+  | LogEvent
+  // Task agent orchestration
+  | TaskRequestedEvent
+  | TaskRoutedEvent
+  | TaskPendingApprovalEvent
+  | TaskApprovedEvent
+  | TaskRejectedEvent
+  | TaskExecutingEvent
+  | TaskResultEvent
+  | TaskFailedEvent;
 
 // Evaluation result from LLM judge
 export interface LLMJudgeResult {

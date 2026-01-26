@@ -141,6 +141,7 @@ export class AgentEventBus {
     const base = {
       runId: event.runId,
       sessionId: event.sessionId || null,  // Include sessionId for historical trace retrieval
+      turnId: event.turnId || null,        // Include turnId for per-turn trace retrieval
       idx,
       eventType: event.type,
       createdAt: new Date(event.timestamp || Date.now()),
@@ -390,6 +391,102 @@ export class AgentEventBus {
           payloadJson: event.payload,
         };
       
+      // Task agent orchestration events
+      case 'task_requested':
+        return {
+          ...base,
+          agentId: event.agentId || 'task_router',
+          label: event.taskType,
+          payloadJson: { 
+            taskId: event.taskId, 
+            taskType: event.taskType, 
+            params: event.params,
+            requiresApproval: event.requiresApproval,
+          },
+        };
+      
+      case 'task_routed':
+        return {
+          ...base,
+          agentId: event.agentId,
+          label: `routed_to_${event.agentId}`,
+          payloadJson: { 
+            taskId: event.taskId, 
+            taskType: event.taskType, 
+            agentName: event.agentName,
+            executionMode: event.executionMode,
+          },
+        };
+      
+      case 'task_pending_approval':
+        return {
+          ...base,
+          agentId: event.agentId,
+          message: event.description,
+          payloadJson: { 
+            taskId: event.taskId, 
+            params: event.params,
+            warnings: event.warnings,
+          },
+        };
+      
+      case 'task_approved':
+        return {
+          ...base,
+          agentId: event.agentId,
+          payloadJson: { 
+            taskId: event.taskId, 
+            approvedBy: event.approvedBy,
+          },
+        };
+      
+      case 'task_rejected':
+        return {
+          ...base,
+          agentId: event.agentId,
+          message: event.reason,
+          payloadJson: { 
+            taskId: event.taskId, 
+            rejectedBy: event.rejectedBy,
+            reason: event.reason,
+          },
+        };
+      
+      case 'task_executing':
+        return {
+          ...base,
+          agentId: event.agentId,
+          payloadJson: { 
+            taskId: event.taskId, 
+            estimatedDuration: event.estimatedDuration,
+          },
+        };
+      
+      case 'task_result':
+        return {
+          ...base,
+          agentId: event.agentId,
+          payloadJson: { 
+            taskId: event.taskId, 
+            success: event.success,
+            data: event.data,
+            durationMs: event.durationMs,
+          },
+        };
+      
+      case 'task_failed':
+        return {
+          ...base,
+          agentId: event.agentId,
+          message: event.error,
+          payloadJson: { 
+            taskId: event.taskId, 
+            error: event.error,
+            retriable: event.retriable,
+            durationMs: event.durationMs,
+          },
+        };
+      
       default:
         return base;
     }
@@ -529,6 +626,39 @@ export class AgentEventBus {
       case 'log':
         const emoji = event.level === 'error' ? '❌' : event.level === 'warn' ? '⚠️' : 'ℹ️';
         console.log(`${prefix} ${emoji} ${event.message}`);
+        break;
+      
+      // Task agent orchestration
+      case 'task_requested':
+        console.log(`${prefix} 📋 Task requested: ${event.taskType} (${event.taskId.slice(0, 8)}) ${event.requiresApproval ? '[requires approval]' : ''}`);
+        break;
+      
+      case 'task_routed':
+        console.log(`${prefix} 🔀 Task routed to ${event.agentName} (${event.executionMode})`);
+        break;
+      
+      case 'task_pending_approval':
+        console.log(`${prefix} ⏳ Task pending approval: ${event.description}`);
+        break;
+      
+      case 'task_approved':
+        console.log(`${prefix} ✅ Task approved${event.approvedBy ? ` by ${event.approvedBy}` : ''}`);
+        break;
+      
+      case 'task_rejected':
+        console.log(`${prefix} 🚫 Task rejected${event.reason ? `: ${event.reason}` : ''}`);
+        break;
+      
+      case 'task_executing':
+        console.log(`${prefix} ⚡ Task executing: ${event.agentId}${event.estimatedDuration ? ` (est: ${event.estimatedDuration})` : ''}`);
+        break;
+      
+      case 'task_result':
+        console.log(`${prefix} 🎯 Task ${event.success ? 'completed' : 'returned'}: ${event.agentId} in ${event.durationMs}ms`);
+        break;
+      
+      case 'task_failed':
+        console.log(`${prefix} 💥 Task failed: ${event.error}${event.retriable ? ' (retriable)' : ''}`);
         break;
     }
   }

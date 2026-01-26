@@ -40,6 +40,7 @@ AgentKit is a production-ready multi-agent chat platform that enables intelligen
 - **GraphRAG-lite** for relationship discovery across your data
 - **Multi-provider LLM Support** (OpenAI, Anthropic, Ollama)
 - **Self-learning ETL Pipelines** with Plan-Act-Reflect pattern
+- **Task Agent Framework** for orchestrating human-in-loop and autonomous agent actions
 
 ---
 
@@ -345,6 +346,10 @@ agentkit/
 │   │       ├── etl/            # ETL operations
 │   │       └── graph/          # Knowledge graph APIs
 │   ├── lib/
+│   │   ├── agents/             # Task Agent Framework
+│   │   │   ├── types.ts        # Agent interfaces
+│   │   │   ├── registry.ts     # Agent registration
+│   │   │   └── executor.ts     # Task execution engine
 │   │   ├── chat/               # Chat orchestration
 │   │   │   ├── mode-classifier.ts
 │   │   │   ├── mode-config.ts
@@ -570,6 +575,160 @@ AgentKit implements a MemGPT-inspired 3-tier memory system:
 - Cross-session knowledge
 
 Configure memory behavior in Settings → Memory Configuration.
+
+---
+
+## Task Agent Framework
+
+AgentKit includes a powerful **Task Agent Framework** for orchestrating agents that perform real-world actions. This enables the chat system to not just answer questions, but to **take action** on behalf of users—updating CRMs, scheduling meetings, querying databases, and more.
+
+### The Power of Agent Coordination
+
+Traditional chatbots answer questions. AgentKit goes further by enabling **agentic workflows** where:
+
+- **Chat identifies intent** → "Close the Acme deal in Salesforce"
+- **Framework routes to agent** → Salesforce Agent selected
+- **Human approves if needed** → "Update Acme status to Closed? [Approve]"
+- **Agent executes** → API call to Salesforce
+- **Result returns to chat** → "Done! Acme deal marked as closed."
+
+This transforms your AI assistant from an information retrieval system into an **intelligent automation platform**.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              CHAT SYSTEM                                     │
+│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐          │
+│  │   Chat Route    │───▶│   Orchestrator  │───▶│    Composer     │          │
+│  │   /api/chat     │    │                 │    │                 │          │
+│  └─────────────────┘    └────────┬────────┘    └─────────────────┘          │
+│                                  │                                           │
+│                                  │ (Task Invocation)                         │
+│                                  ▼                                           │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │                      TASK AGENT FRAMEWORK                              │  │
+│  │  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐   │  │
+│  │  │  Task Executor  │───▶│  Task Registry  │───▶│   Task Agents   │   │  │
+│  │  │                 │    │                 │    │                 │   │  │
+│  │  │ • Routing       │    │ • Registration  │    │ • Salesforce    │   │  │
+│  │  │ • Approval      │    │ • Discovery     │    │ • Calendar      │   │  │
+│  │  │ • Timeout/Retry │    │ • Capabilities  │    │ • Oracle        │   │  │
+│  │  └────────┬────────┘    └─────────────────┘    │ • Custom...     │   │  │
+│  │           │                                     └─────────────────┘   │  │
+│  │           ▼                                                           │  │
+│  │  ┌─────────────────┐                                                  │  │
+│  │  │   Event Bus     │◀──────────── All events for observability        │  │
+│  │  │ (Observability) │                                                  │  │
+│  │  └─────────────────┘                                                  │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Two Execution Modes
+
+| Mode | Description | Use Case |
+|------|-------------|----------|
+| **Human-in-Loop** | Requires user approval before execution | Mutations, deletions, external API calls |
+| **Human-out-of-Loop** | Executes autonomously | Lookups, read-only queries, low-risk operations |
+
+### Human-in-Loop Workflow
+
+```
+User: "Update the Acme account status to Closed Won"
+         │
+         ▼
+┌──────────────────────────────┐
+│  LLM identifies task needed  │
+│  taskType: salesforce_update │
+└──────────┬───────────────────┘
+           │
+           ▼
+┌──────────────────────────────┐
+│  Task Executor routes to     │
+│  Salesforce Agent            │
+│  (human_in_loop mode)        │
+└──────────┬───────────────────┘
+           │
+           ▼
+┌──────────────────────────────┐
+│  Approval UI displayed       │
+│  "Update Acme: status →      │
+│   Closed Won"                │
+│  [Approve] [Reject]          │
+└──────────┬───────────────────┘
+           │
+     User clicks Approve
+           │
+           ▼
+┌──────────────────────────────┐
+│  Agent executes              │
+│  → Salesforce API call       │
+└──────────┬───────────────────┘
+           │
+           ▼
+┌──────────────────────────────┐
+│  Result returned to chat     │
+│  "✓ Acme updated to          │
+│   Closed Won"                │
+└──────────────────────────────┘
+```
+
+### Key Capabilities
+
+- **Capability-based Routing**: Agents register what task types they handle; framework routes automatically
+- **Preparation Step**: Agents validate parameters and generate human-readable descriptions before execution
+- **Event Observability**: All task lifecycle events stream through the Event Bus for tracing
+- **Configurable Retry**: Exponential backoff with configurable retry policies
+- **Timeout Protection**: Prevent runaway tasks with per-task timeout configuration
+
+### Creating Custom Agents
+
+```typescript
+import type { TaskAgent } from '@/lib/agents';
+import { taskRegistry } from '@/lib/agents';
+
+const salesforceAgent: TaskAgent = {
+  id: 'salesforce_agent',
+  name: 'Salesforce Agent',
+  description: 'Updates and queries Salesforce CRM data',
+  version: '1.0.0',
+  executionMode: 'human_in_loop',
+  capabilities: ['salesforce_update', 'salesforce_query'],
+
+  canHandle(taskType) {
+    return this.capabilities.includes(taskType);
+  },
+
+  async prepare(params) {
+    return {
+      valid: true,
+      description: `Update ${params.params.recordId}: ${params.params.field} → ${params.params.value}`,
+      warnings: ['This will modify production data'],
+    };
+  },
+
+  async execute(params, context) {
+    // Call Salesforce API...
+    return { success: true, data: result, durationMs: 1200 };
+  },
+};
+
+taskRegistry.register(salesforceAgent);
+```
+
+### Event Types
+
+| Event | Description |
+|-------|-------------|
+| `task_requested` | Task execution requested |
+| `task_routed` | Task routed to specific agent |
+| `task_pending_approval` | Awaiting human approval |
+| `task_approved` / `task_rejected` | Human decision |
+| `task_executing` | Agent is executing |
+| `task_result` / `task_failed` | Execution outcome |
+
+For complete documentation, see [docs/task-agent-framework.md](docs/task-agent-framework.md).
 
 ---
 
