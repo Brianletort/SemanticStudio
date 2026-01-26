@@ -36,6 +36,9 @@ class AssertionEvaluator {
       case 'event_occurred':
         return this.eventOccurred(assertion.params, context);
       
+      case 'event_has_field':
+        return this.eventHasField(assertion.params, context);
+      
       case 'response_time_under':
         return this.responseTimeUnder(assertion.params, context);
       
@@ -291,6 +294,47 @@ class AssertionEvaluator {
   }
   
   /**
+   * Assert event has a specific field
+   */
+  private eventHasField(
+    params: Record<string, unknown>,
+    context: Record<string, unknown>
+  ): AssertionResult {
+    const events = context.events as Array<Record<string, unknown>> | undefined;
+    const eventType = params.type as string;
+    const field = params.field as string;
+    
+    if (!events) {
+      return {
+        assertion: 'event_has_field',
+        passed: false,
+        message: 'No events in context',
+      };
+    }
+    
+    const matchingEvent = events.find(e => e.type === eventType);
+    
+    if (!matchingEvent) {
+      return {
+        assertion: 'event_has_field',
+        passed: false,
+        message: `Event ${eventType} not found`,
+      };
+    }
+    
+    const passed = field in matchingEvent && matchingEvent[field] !== undefined;
+    
+    return {
+      assertion: 'event_has_field',
+      passed,
+      message: passed 
+        ? `Event ${eventType} has field ${field}` 
+        : `Event ${eventType} missing field ${field}`,
+      actual: matchingEvent[field],
+    };
+  }
+  
+  /**
    * Assert response time under threshold
    */
   private responseTimeUnder(
@@ -404,6 +448,11 @@ export const assert = {
   eventOccurred: (type: string): TestAssertion => ({
     type: 'event_occurred',
     params: { type },
+  }),
+  
+  eventHasField: (type: string, field: string): TestAssertion => ({
+    type: 'event_has_field',
+    params: { type, field },
   }),
   
   responseTimeUnder: (ms: number): TestAssertion => ({

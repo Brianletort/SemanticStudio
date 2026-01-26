@@ -21,6 +21,39 @@ const mockFileUploadResponse = {
   purpose: 'vision',
 };
 
+// Mock responses for Responses API
+const mockResponsesResponse = {
+  id: 'resp-test123',
+  status: 'completed',
+  model: 'gpt-5-mini',
+  output_text: 'This is a test response from the Responses API.',
+  output: [
+    { type: 'message', content: [{ type: 'output_text', text: 'Test response' }] },
+  ],
+  usage: {
+    input_tokens: 10,
+    output_tokens: 15,
+    total_tokens: 25,
+  },
+};
+
+const mockDeepResearchResponse = {
+  id: 'resp-research-123',
+  status: 'in_progress',
+  model: 'o3-deep-research',
+};
+
+const mockDeepResearchComplete = {
+  id: 'resp-research-123',
+  status: 'completed',
+  model: 'o3-deep-research',
+  output_text: '# Research Report\n\nFindings here...',
+  output: [
+    { type: 'web_search_call', action: { type: 'search', query: 'test' }, status: 'completed' },
+    { type: 'web_search_call', action: { type: 'open_page', url: 'https://example.com' }, status: 'completed' },
+  ],
+};
+
 // Mock functions that we can control
 const mockImagesGenerate = vi.fn().mockResolvedValue(mockImageGenerationResponse);
 const mockImagesEdit = vi.fn().mockResolvedValue(mockImageGenerationResponse);
@@ -28,6 +61,8 @@ const mockFilesCreate = vi.fn().mockResolvedValue(mockFileUploadResponse);
 const mockModelsList = vi.fn().mockResolvedValue({
   data: [
     { id: 'gpt-5-mini' },
+    { id: 'gpt-5.2' },
+    { id: 'o3-deep-research' },
     { id: 'gpt-image-1.5' },
     { id: 'text-embedding-3-large' },
   ],
@@ -40,6 +75,15 @@ const mockChatCreate = vi.fn().mockResolvedValue({
 const mockEmbeddingsCreate = vi.fn().mockResolvedValue({
   data: [{ embedding: new Array(1536).fill(0.1) }],
 });
+
+// Responses API mocks
+const mockResponsesCreate = vi.fn().mockImplementation((params: { model?: string }) => {
+  if (params.model === 'o3-deep-research') {
+    return Promise.resolve(mockDeepResearchResponse);
+  }
+  return Promise.resolve(mockResponsesResponse);
+});
+const mockResponsesRetrieve = vi.fn().mockResolvedValue(mockDeepResearchComplete);
 
 // Mock the OpenAI module
 vi.mock('openai', () => {
@@ -56,6 +100,11 @@ vi.mock('openai', () => {
         completions: {
           create: mockChatCreate,
         },
+      };
+      // New Responses API
+      responses = {
+        create: mockResponsesCreate,
+        retrieve: mockResponsesRetrieve,
       };
       models = {
         list: mockModelsList,
@@ -82,10 +131,21 @@ describe('OpenAIProvider', () => {
     mockModelsList.mockResolvedValue({
       data: [
         { id: 'gpt-5-mini' },
+        { id: 'gpt-5.2' },
+        { id: 'o3-deep-research' },
         { id: 'gpt-image-1.5' },
         { id: 'text-embedding-3-large' },
       ],
     });
+    // Reset Responses API mocks
+    mockResponsesCreate.mockImplementation((params: { model?: string }) => {
+      if (params.model === 'o3-deep-research') {
+        return Promise.resolve(mockDeepResearchResponse);
+      }
+      return Promise.resolve(mockResponsesResponse);
+    });
+    mockResponsesRetrieve.mockResolvedValue(mockDeepResearchComplete);
+    
     provider = new OpenAIProvider('test-api-key');
   });
 
@@ -302,6 +362,180 @@ describe('OpenAIProvider', () => {
       const result = await provider.listModels();
       
       expect(result).toEqual([]);
+    });
+  });
+
+  // ============================================
+  // RESPONSES API TESTS
+  // ============================================
+
+  describe('chat (Responses API)', () => {
+    beforeEach(() => {
+      mockResponsesCreate.mockResolvedValue(mockResponsesResponse);
+    });
+
+    it('should call responses.create with correct parameters', async () => {
+      const messages = [
+        { role: 'system' as const, content: 'You are a helpful assistant' },
+        { role: 'user' as const, content: 'Hello' },
+      ];
+      
+      const result = await provider.chat(messages);
+      
+      expect(mockResponsesCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'gpt-5-mini',
+          input: expect.any(String),
+        })
+      );
+      expect(result.content).toBe(mockResponsesResponse.output_text);
+      expect(result.responseId).toBe(mockResponsesResponse.id);
+    });
+
+    it('should use custom model when provided', async () => {
+      const messages = [{ role: 'user' as const, content: 'Hello' }];
+      
+      await provider.chat(messages, { model: 'gpt-5.2' });
+      
+      expect(mockResponsesCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'gpt-5.2',
+        })
+      );
+    });
+
+    it('should include instructions from system message', async () => {
+      const messages = [
+        { role: 'system' as const, content: 'Be concise' },
+        { role: 'user' as const, content: 'Hello' },
+      ];
+      
+      await provider.chat(messages);
+      
+      expect(mockResponsesCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          instructions: 'Be concise',
+        })
+      );
+    });
+
+    it('should pass reasoning options when provided', async () => {
+      const messages = [{ role: 'user' as const, content: 'Hello' }];
+      
+      await provider.chat(messages, { reasoning: { effort: 'high' } });
+      
+      expect(mockResponsesCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reasoning: { effort: 'high' },
+        })
+      );
+    });
+
+    it('should handle API errors', async () => {
+      mockResponsesCreate.mockRejectedValueOnce(new Error('API error'));
+      
+      const messages = [{ role: 'user' as const, content: 'Hello' }];
+      
+      await expect(provider.chat(messages)).rejects.toThrow('API error');
+    });
+  });
+
+  describe('deepResearch', () => {
+    beforeEach(() => {
+      mockResponsesCreate.mockResolvedValue(mockDeepResearchResponse);
+    });
+
+    it('should call responses.create with o3-deep-research model', async () => {
+      const result = await provider.deepResearch('Research AI trends');
+      
+      expect(mockResponsesCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'o3-deep-research',
+          input: 'Research AI trends',
+          background: true,
+        })
+      );
+      expect(result.id).toBe(mockDeepResearchResponse.id);
+      expect(result.status).toBe('in_progress');
+    });
+
+    it('should include web_search_preview tool by default', async () => {
+      await provider.deepResearch('Research topic');
+      
+      expect(mockResponsesCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tools: expect.arrayContaining([
+            { type: 'web_search_preview' },
+          ]),
+        })
+      );
+    });
+
+    it('should pass custom instructions when provided', async () => {
+      await provider.deepResearch('Research topic', {
+        instructions: 'Focus on recent developments',
+      });
+      
+      expect(mockResponsesCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          instructions: 'Focus on recent developments',
+        })
+      );
+    });
+
+    it('should handle API errors', async () => {
+      mockResponsesCreate.mockRejectedValueOnce(new Error('Research failed'));
+      
+      await expect(provider.deepResearch('Research topic')).rejects.toThrow('Research failed');
+    });
+  });
+
+  describe('getResponseStatus', () => {
+    beforeEach(() => {
+      mockResponsesRetrieve.mockResolvedValue(mockDeepResearchComplete);
+    });
+
+    it('should retrieve response status by ID', async () => {
+      const result = await provider.getResponseStatus('resp-research-123');
+      
+      expect(mockResponsesRetrieve).toHaveBeenCalledWith('resp-research-123');
+      expect(result.id).toBe(mockDeepResearchComplete.id);
+      expect(result.status).toBe('completed');
+    });
+
+    it('should count sources found from web search calls', async () => {
+      const result = await provider.getResponseStatus('resp-research-123');
+      
+      // mockDeepResearchComplete has 2 web_search_calls
+      expect(result.sourcesFound).toBe(2);
+      expect(result.searchesCompleted).toBe(2);
+    });
+
+    it('should return output_text when completed', async () => {
+      const result = await provider.getResponseStatus('resp-research-123');
+      
+      expect(result.output_text).toBe(mockDeepResearchComplete.output_text);
+    });
+
+    it('should handle in_progress status', async () => {
+      mockResponsesRetrieve.mockResolvedValueOnce({
+        id: 'resp-research-123',
+        status: 'in_progress',
+        output: [
+          { type: 'web_search_call', status: 'completed' },
+        ],
+      });
+      
+      const result = await provider.getResponseStatus('resp-research-123');
+      
+      expect(result.status).toBe('in_progress');
+      expect(result.searchesCompleted).toBe(1);
+    });
+
+    it('should handle API errors', async () => {
+      mockResponsesRetrieve.mockRejectedValueOnce(new Error('Not found'));
+      
+      await expect(provider.getResponseStatus('invalid-id')).rejects.toThrow('Not found');
     });
   });
 });

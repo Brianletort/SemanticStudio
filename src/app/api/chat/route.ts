@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { streamChat, generateImage } from "@/lib/llm";
+import { streamChat, generateImage, deepResearch, getDeepResearchStatus } from "@/lib/llm";
 import { domainRetriever } from "@/lib/retrieval";
 import { braveSearch, formatSearchResultsForContext, isBraveSearchConfigured } from "@/lib/search";
 import { db } from "@/lib/db";
 import { userSettings } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import type { ChatMessage } from "@/lib/llm/types";
+import type { ChatMessage, ModelRole } from "@/lib/llm/types";
 import type { RetrievalMode } from "@/lib/retrieval";
 import { 
   MemoryService, 
@@ -24,6 +24,7 @@ import {
   getModeConfig,
   getResolvedModeConfig,
   DEFAULT_MODE_CONFIGS,
+  createClarificationAgent,
   type ChatMode,
   type AgentEvent,
   type ModeClassification,
@@ -35,7 +36,9 @@ import {
 import { v4 as uuidv4 } from "uuid";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// Research mode can take up to 30 minutes, so we set a high max duration
+// Other modes will complete much faster but this allows for long research jobs
+export const maxDuration = 1800; // 30 minutes
 
 // Default user ID for development
 const DEV_USER_ID = '00000000-0000-0000-0000-000000000001';
@@ -224,8 +227,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Helper to emit events (always emits for DB persistence)
-    const emitEvent = async (event: Omit<AgentEvent, 'runId'>) => {
-      await eventBus.emit({ ...event, runId } as AgentEvent);
+    // Includes sessionId for historical trace retrieval
+    const emitEvent = async (event: Omit<AgentEvent, 'runId' | 'sessionId'>) => {
+      await eventBus.emit({ ...event, runId, sessionId: sessionId || undefined } as AgentEvent);
     };
 
     // Handle auto mode classification
@@ -426,7 +430,261 @@ export async function POST(request: NextRequest) {
     }
 
     // Determine which model role to use based on mode config
-    const modelRole = modeConfig.composerRole as "composer" | "composer_fast";
+    // The composerRole can be 'composer', 'composer_fast', or 'research'
+    const modelRole = modeConfig.composerRole as ModelRole;
+
+    // ============================================
+    // RESEARCH MODE FLOW
+    // Uses o3-deep-research with background mode
+    // ============================================
+    if (mode === 'research' && modeConfig.enableClarification) {
+      const clarificationAgent = createClarificationAgent();
+      
+      // Check if this is an answer to previous clarification questions
+      // (We would need to track this in session state - for now, check query specificity)
+      const clarificationResult = await clarificationAgent.analyze(message);
+      
+      if (clarificationResult.shouldClarify) {
+        // Emit clarification requested event
+        await emitEvent({
+          type: 'clarification_requested',
+          questionCount: clarificationResult.questions.length,
+          originalQuery: message,
+        });
+        
+        // Format clarification questions for chat response
+        const clarificationResponse = clarificationAgent.formatForChat(clarificationResult);
+        
+        // Return clarification questions as the response
+        const encoder = new TextEncoder();
+        const clarificationStream = new ReadableStream({
+          async start(controller) {
+            // Send mode info
+            if (modeClassification) {
+              const modeData = JSON.stringify({ 
+                type: 'mode', 
+                classification: modeClassification,
+                runId,
+                turnId,
+              });
+              controller.enqueue(encoder.encode(`data: ${modeData}\n\n`));
+            }
+
+            // Send collected events
+            if (enableTrace && collectedEvents.length > 0) {
+              for (const event of collectedEvents) {
+                const eventData = JSON.stringify({ type: 'agent', event });
+                controller.enqueue(encoder.encode(`data: ${eventData}\n\n`));
+              }
+            }
+
+            // Send clarification questions as content
+            const data = JSON.stringify({ type: 'content', content: clarificationResponse });
+            controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+            
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            controller.close();
+            
+            await eventBus.shutdown();
+          },
+        });
+
+        return new Response(clarificationStream, {
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+          },
+        });
+      }
+      
+      // Query is specific enough - proceed to deep research
+      // Use o3-deep-research with background mode
+      console.log('[Research] Starting deep research with o3-deep-research');
+      
+      // Build research input with context
+      const researchInput = `${message}
+
+${retrievalContext ? `\n## Available Data Context\n${retrievalContext}` : ''}
+${memoryContextText ? `\n## User Context\n${memoryContextText}` : ''}`;
+
+      try {
+        // Submit deep research job
+        const researchJob = await deepResearch(researchInput, {
+          background: true,
+          instructions: `You are conducting comprehensive research for a business intelligence platform. 
+Analyze the query thoroughly, search the web for relevant information, and provide a detailed report.
+Include citations and sources for all findings.`,
+        });
+
+        // Emit job created event
+        await emitEvent({
+          type: 'research_job_created',
+          jobId: researchJob.id,
+          estimatedDuration: '5-30 minutes',
+        });
+
+        // Create streaming response for polling loop
+        const encoder = new TextEncoder();
+        const researchStream = new ReadableStream({
+          async start(controller) {
+            try {
+              // Send mode info
+              if (modeClassification) {
+                const modeData = JSON.stringify({ 
+                  type: 'mode', 
+                  classification: modeClassification,
+                  runId,
+                  turnId,
+                });
+                controller.enqueue(encoder.encode(`data: ${modeData}\n\n`));
+              }
+
+              // Send collected events
+              if (enableTrace && collectedEvents.length > 0) {
+                for (const event of collectedEvents) {
+                  const eventData = JSON.stringify({ type: 'agent', event });
+                  controller.enqueue(encoder.encode(`data: ${eventData}\n\n`));
+                }
+              }
+
+              // Send initial progress message
+              const startMsg = JSON.stringify({ 
+                type: 'content', 
+                content: '🔬 **Starting Deep Research**\n\nI\'m conducting comprehensive research on your query. This may take several minutes...\n\n' 
+              });
+              controller.enqueue(encoder.encode(`data: ${startMsg}\n\n`));
+
+              // Poll for completion (up to 30 minutes)
+              const maxPolls = 360; // 30 minutes with 5 second intervals
+              const pollInterval = 5000; // 5 seconds
+              let lastSourcesFound = 0;
+              let lastSearchesCompleted = 0;
+              const researchStartTime = Date.now();
+
+              for (let i = 0; i < maxPolls; i++) {
+                await new Promise(resolve => setTimeout(resolve, pollInterval));
+                
+                const status = await getDeepResearchStatus(researchJob.id);
+                
+                // Emit progress event
+                const progressEvent: AgentEvent = {
+                  runId,
+                  sessionId: sessionId || undefined,
+                  type: 'research_progress',
+                  jobId: researchJob.id,
+                  status: status.status,
+                  message: `Researching... (${Math.round((Date.now() - researchStartTime) / 1000)}s)`,
+                  searchesCompleted: status.searchesCompleted,
+                  sourcesFound: status.sourcesFound,
+                  progressPercent: Math.min(90, Math.round((i / maxPolls) * 100)),
+                };
+                await eventBus.emit(progressEvent);
+                
+                if (enableTrace) {
+                  const eventData = JSON.stringify({ type: 'agent', event: progressEvent });
+                  controller.enqueue(encoder.encode(`data: ${eventData}\n\n`));
+                }
+
+                // Stream progress updates to user
+                if (status.sourcesFound && status.sourcesFound > lastSourcesFound) {
+                  const progressMsg = JSON.stringify({ 
+                    type: 'content', 
+                    content: `📚 Found ${status.sourcesFound} sources...\n` 
+                  });
+                  controller.enqueue(encoder.encode(`data: ${progressMsg}\n\n`));
+                  lastSourcesFound = status.sourcesFound;
+                }
+
+                if (status.searchesCompleted && status.searchesCompleted > lastSearchesCompleted) {
+                  lastSearchesCompleted = status.searchesCompleted;
+                }
+
+                // Check if complete
+                if (status.status === 'completed') {
+                  const durationMs = Date.now() - researchStartTime;
+                  
+                  // Emit completion event
+                  const completeEvent: AgentEvent = {
+                    runId,
+                    sessionId: sessionId || undefined,
+                    type: 'research_complete',
+                    jobId: researchJob.id,
+                    totalSources: status.sourcesFound || 0,
+                    totalSearches: status.searchesCompleted || 0,
+                    durationMs,
+                    reportLength: status.output_text?.length || 0,
+                  };
+                  await eventBus.emit(completeEvent);
+                  
+                  if (enableTrace) {
+                    const eventData = JSON.stringify({ type: 'agent', event: completeEvent });
+                    controller.enqueue(encoder.encode(`data: ${eventData}\n\n`));
+                  }
+
+                  // Stream the final report
+                  const divider = JSON.stringify({ type: 'content', content: '\n\n---\n\n# Research Report\n\n' });
+                  controller.enqueue(encoder.encode(`data: ${divider}\n\n`));
+                  
+                  if (status.output_text) {
+                    // Stream in chunks for better UX
+                    const chunkSize = 500;
+                    for (let j = 0; j < status.output_text.length; j += chunkSize) {
+                      const chunk = status.output_text.slice(j, j + chunkSize);
+                      const chunkData = JSON.stringify({ type: 'content', content: chunk });
+                      controller.enqueue(encoder.encode(`data: ${chunkData}\n\n`));
+                    }
+                  }
+
+                  break;
+                }
+
+                // Check for failure
+                if (status.status === 'failed' || status.status === 'cancelled') {
+                  const errorMsg = JSON.stringify({ 
+                    type: 'content', 
+                    content: `\n\n❌ Research ${status.status}. Please try again with a more specific query.` 
+                  });
+                  controller.enqueue(encoder.encode(`data: ${errorMsg}\n\n`));
+                  break;
+                }
+              }
+
+              // Send evaluation trigger
+              const evalData = JSON.stringify({ type: 'evaluation', turnId, runId });
+              controller.enqueue(encoder.encode(`data: ${evalData}\n\n`));
+
+              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+              controller.close();
+              
+              await eventBus.shutdown();
+            } catch (error) {
+              console.error("Research streaming error:", error);
+              const errorData = JSON.stringify({ 
+                type: 'content',
+                content: "Sorry, there was an error during research." 
+              });
+              controller.enqueue(encoder.encode(`data: ${errorData}\n\n`));
+              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+              controller.close();
+              
+              await eventBus.shutdown();
+            }
+          },
+        });
+
+        return new Response(researchStream, {
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+          },
+        });
+      } catch (error) {
+        console.error("Deep research error:", error);
+        // Fall through to standard chat if deep research fails
+      }
+    }
 
     // Build file context from attachments
     const fileContext = buildFileContext(attachments as FileAttachmentData[]);
@@ -526,6 +784,7 @@ If the retrieved data doesn't contain the answer, you can still provide helpful 
           // Emit composition finished event and stream it
           const finishedEvent: AgentEvent = {
             runId,
+            sessionId: sessionId || undefined,
             type: 'agent_finished',
             agentId: 'composer',
             summary: `Generated ${fullResponse.length} character response`,
@@ -555,6 +814,7 @@ If the retrieved data doesn't contain the answer, you can still provide helpful 
               if (result) {
                 const memorySavedEvent: AgentEvent = {
                   runId,
+                  sessionId: sessionId || undefined,
                   type: 'memory_saved',
                   sessionFactsCount: result.sessionFactsSaved ?? 0,
                   userFactsCount: result.userFactsSaved ?? 0,
@@ -588,6 +848,7 @@ If the retrieved data doesn't contain the answer, you can still provide helpful 
               if (evalResult) {
                 const judgeEvent: AgentEvent = {
                   runId,
+                  sessionId: sessionId || undefined,
                   type: 'judge_evaluation',
                   qualityScore: evalResult.qualityScore ?? 0,
                   relevance: evalResult.relevanceScore ?? 0,

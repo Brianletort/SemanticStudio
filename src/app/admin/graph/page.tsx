@@ -90,6 +90,8 @@ const nodeColors: Record<string, string> = {
 
 export default function GraphVisualizationPage() {
   const graphRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
   const [loading, setLoading] = useState(true);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
@@ -103,6 +105,29 @@ export default function GraphVisualizationPage() {
 
   useEffect(() => {
     fetchGraphData();
+  }, []);
+
+  // Track container dimensions
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        const { clientWidth, clientHeight } = containerRef.current;
+        if (clientWidth > 0 && clientHeight > 0) {
+          setDimensions({ width: clientWidth, height: clientHeight });
+        }
+      }
+    };
+    
+    updateDimensions();
+    window.addEventListener('resize', updateDimensions);
+    
+    // Also update after a short delay to ensure the container is rendered
+    const timer = setTimeout(updateDimensions, 100);
+    
+    return () => {
+      window.removeEventListener('resize', updateDimensions);
+      clearTimeout(timer);
+    };
   }, []);
 
 
@@ -217,7 +242,8 @@ export default function GraphVisualizationPage() {
     setConnectedNodes(connected);
   }, [selectedNode, graphData]);
 
-  const handleNodeClick = (node: any) => {
+  const handleNodeClick = useCallback((node: any) => {
+    if (!node) return;
     const graphNode = node as GraphNode;
     setSelectedNode(graphNode);
     setActiveTab("details");
@@ -246,7 +272,7 @@ export default function GraphVisualizationPage() {
         );
       }
     }
-  };
+  }, []);
 
   const handleConnectedNodeClick = (connectedNode: GraphNode) => {
     // Find the node in the graph and click it
@@ -315,7 +341,7 @@ export default function GraphVisualizationPage() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Main Graph Area */}
-        <div className="flex-1 relative bg-zinc-950">
+        <div ref={containerRef} className="flex-1 relative bg-zinc-950">
           {/* Controls */}
           <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
             <Card className="w-64 bg-background/95 backdrop-blur">
@@ -421,6 +447,8 @@ export default function GraphVisualizationPage() {
             <ForceGraph3D
               ref={graphRef}
               graphData={filteredData}
+              width={dimensions.width}
+              height={dimensions.height}
               nodeId="id"
               nodeLabel={(node: any) => `${node.type}: ${node.name}`}
               nodeColor={getNodeColor}
@@ -433,7 +461,12 @@ export default function GraphVisualizationPage() {
               linkWidth={(link: any) => Math.max(0.5, link.weight)}
               linkColor={() => "rgba(148, 163, 184, 0.4)"}
               linkOpacity={0.6}
-              onNodeClick={handleNodeClick}
+              onNodeClick={(node: any) => {
+                if (node) {
+                  setSelectedNode(node as GraphNode);
+                  setActiveTab("details");
+                }
+              }}
               onNodeHover={(node: any) => {
                 document.body.style.cursor = node ? 'pointer' : 'default';
               }}
@@ -442,14 +475,13 @@ export default function GraphVisualizationPage() {
               enableNodeDrag={false}
               enableNavigationControls={true}
               enablePointerInteraction={true}
-              controlType="trackball"
             />
           )}
         </div>
 
         {/* Node Details Sidebar */}
         {selectedNode && (
-          <div className="w-96 border-l bg-background flex flex-col">
+          <div className="w-96 border-l bg-background flex flex-col relative z-20">
             <div className="p-4 border-b flex items-center justify-between">
               <h3 className="font-semibold">Node Details</h3>
               <Button

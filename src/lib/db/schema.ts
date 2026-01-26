@@ -718,6 +718,7 @@ export const industryStatistics = pgTable('industry_statistics', {
 export const chatAgentEvents = pgTable('chat_agent_events', {
   id: uuid('id').primaryKey().defaultRandom(),
   runId: uuid('run_id').notNull(),
+  sessionId: uuid('session_id').references(() => sessions.id, { onDelete: 'cascade' }),
   idx: integer('idx').notNull(),
   eventType: text('event_type').notNull(),
   agentId: text('agent_id'),
@@ -728,6 +729,7 @@ export const chatAgentEvents = pgTable('chat_agent_events', {
   createdAt: timestamp('created_at').defaultNow(),
 }, (table) => ({
   runIdIdx: index('idx_chat_agent_events_run_id').on(table.runId),
+  sessionIdIdx: index('idx_chat_agent_events_session_id').on(table.sessionId),
   createdAtIdx: index('idx_chat_agent_events_created_at').on(table.createdAt),
 }));
 

@@ -223,7 +223,7 @@ export const modeTestScenarios: TestScenario[] = [
   // Research Mode Tests
   {
     id: 'mode-research-clarification',
-    name: 'Research mode asks clarifying questions',
+    name: 'Research mode asks clarifying questions for vague query',
     category: 'modes',
     tags: ['research', 'clarification'],
     steps: [
@@ -248,10 +248,99 @@ export const modeTestScenarios: TestScenario[] = [
   },
   
   {
+    id: 'mode-research-job-created',
+    name: 'Research mode creates background job for specific query',
+    category: 'modes',
+    tags: ['research', 'background', 'deep-research'],
+    timeout: 120000, // 2 minute timeout for research job
+    steps: [
+      {
+        id: 'select-research',
+        action: 'select_mode',
+        params: { mode: 'research' },
+        description: 'Select research mode',
+      },
+      {
+        id: 'send',
+        action: 'send_message',
+        params: { 
+          message: 'Research market trends for AI startups in 2024, including funding rounds, growth metrics, and key players in the enterprise AI space.' 
+        },
+        description: 'Send specific research query',
+      },
+    ],
+    assertions: [
+      // Should create a background research job
+      assert.eventOccurred('research_job_created'),
+      assert.eventHasField('research_job_created', 'jobId'),
+    ],
+  },
+  
+  {
+    id: 'mode-research-progress',
+    name: 'Research mode emits progress events during execution',
+    category: 'modes',
+    tags: ['research', 'progress', 'deep-research'],
+    timeout: 300000, // 5 minute timeout for full research
+    steps: [
+      {
+        id: 'select-research',
+        action: 'select_mode',
+        params: { mode: 'research' },
+        description: 'Select research mode',
+      },
+      {
+        id: 'send',
+        action: 'send_message',
+        params: { 
+          message: 'Research the competitive landscape for electric vehicles in 2024, including Tesla, BYD, and emerging players. Include market share data and growth projections.' 
+        },
+        description: 'Send detailed research query',
+      },
+    ],
+    assertions: [
+      assert.eventOccurred('research_job_created'),
+      assert.eventOccurred('research_progress'),
+    ],
+  },
+  
+  {
+    id: 'mode-research-complete',
+    name: 'Research mode completes with sources and citations',
+    category: 'modes',
+    tags: ['research', 'completion', 'deep-research'],
+    timeout: 600000, // 10 minute timeout for full research
+    steps: [
+      {
+        id: 'select-research',
+        action: 'select_mode',
+        params: { mode: 'research' },
+        description: 'Select research mode',
+      },
+      {
+        id: 'send',
+        action: 'send_message',
+        params: { 
+          message: 'Research the latest developments in quantum computing in 2024, focusing on major breakthroughs, key companies, and practical applications.' 
+        },
+        description: 'Send research query',
+      },
+    ],
+    assertions: [
+      assert.eventOccurred('research_job_created'),
+      assert.eventOccurred('research_complete'),
+      // Response should contain URLs (citations)
+      assert.responseContains('http'),
+      assert.hasEvaluation(),
+    ],
+  },
+  
+  {
     id: 'mode-research-specific',
     name: 'Research mode with specific query skips clarification',
     category: 'modes',
     tags: ['research', 'direct'],
+    timeout: 120000, // 2 minute timeout
     steps: [
       {
         id: 'select-research',
@@ -269,9 +358,9 @@ export const modeTestScenarios: TestScenario[] = [
       },
     ],
     assertions: [
-      // Specific query should not need clarification
+      // Specific query should create job immediately (no clarification)
+      assert.eventOccurred('research_job_created'),
       assert.hasEvaluation(),
-      assert.qualityAbove(0.7),
     ],
   },
   

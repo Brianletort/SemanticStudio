@@ -9,6 +9,35 @@ export interface ChatOptions {
   maxTokens?: number;
   stream?: boolean;
   responseFormat?: 'text' | 'json';
+  // Responses API options
+  reasoning?: ReasoningOptions;
+  verbosity?: 'low' | 'medium' | 'high';
+  tools?: ResponsesTool[];
+  instructions?: string;
+}
+
+// Responses API specific types
+export type ReasoningEffort = 'none' | 'low' | 'medium' | 'high' | 'xhigh';
+
+export interface ReasoningOptions {
+  effort?: ReasoningEffort;
+  summary?: 'auto' | 'none';
+}
+
+export interface ResponsesTool {
+  type: 'web_search_preview' | 'file_search' | 'mcp' | 'code_interpreter' | 'function';
+  // For file_search
+  vector_store_ids?: string[];
+  // For MCP
+  server_label?: string;
+  server_url?: string;
+  require_approval?: 'never' | 'always';
+  // For function
+  function?: {
+    name: string;
+    description?: string;
+    parameters?: Record<string, unknown>;
+  };
 }
 
 export interface ChatResponse {
@@ -19,6 +48,13 @@ export interface ChatResponse {
     completionTokens: number;
     totalTokens: number;
   };
+  // Responses API additions
+  responseId?: string;
+  toolCalls?: Array<{
+    type: string;
+    name?: string;
+    arguments?: Record<string, unknown>;
+  }>;
 }
 
 export interface EmbeddingOptions {
@@ -89,10 +125,10 @@ export interface ImageGenerationResult {
 export interface LLMProvider {
   name: string;
   
-  // Chat completion
+  // Chat completion (uses Responses API for OpenAI)
   chat(messages: ChatMessage[], options?: ChatOptions): Promise<ChatResponse>;
   
-  // Streaming chat
+  // Streaming chat (uses Responses API for OpenAI)
   streamChat(messages: ChatMessage[], options?: ChatOptions): AsyncGenerator<string, void, unknown>;
   
   // Embeddings
@@ -109,6 +145,12 @@ export interface LLMProvider {
   
   // Upload file to provider for image editing (optional)
   uploadFile?(file: Buffer, filename: string, mimeType: string): Promise<string>; // Returns file ID
+  
+  // Deep research with background mode (optional - OpenAI only)
+  deepResearch?(input: string, options?: DeepResearchOptions): Promise<DeepResearchResponse>;
+  
+  // Get status of background response (optional - OpenAI only)
+  getResponseStatus?(responseId: string): Promise<DeepResearchStatus>;
   
   // Check if provider is available
   isAvailable(): Promise<boolean>;
@@ -137,4 +179,71 @@ export interface ModelConfigRecord {
   config: Record<string, unknown>;
   fallbackProvider?: ProviderName;
   fallbackModel?: string;
+}
+
+// ============================================
+// Deep Research Types (Responses API)
+// ============================================
+
+export interface DeepResearchOptions {
+  background?: boolean;
+  maxToolCalls?: number;
+  instructions?: string;
+}
+
+export interface DeepResearchResponse {
+  id: string;
+  status: ResponseStatus;
+  output_text?: string;
+  output?: ResponseOutputItem[];
+}
+
+export type ResponseStatus = 'queued' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
+
+export interface ResponseOutputItem {
+  type: 'message' | 'web_search_call' | 'file_search_call' | 'mcp_tool_call' | 'code_interpreter_call';
+  // For message
+  content?: Array<{
+    type: 'output_text';
+    text: string;
+    annotations?: ResponseAnnotation[];
+  }>;
+  // For web_search_call
+  action?: {
+    type: 'search' | 'open_page' | 'find_in_page';
+    query?: string;
+    url?: string;
+  };
+  status?: 'completed' | 'in_progress' | 'failed';
+}
+
+export interface ResponseAnnotation {
+  url: string;
+  title?: string;
+  start_index: number;
+  end_index: number;
+}
+
+export interface DeepResearchStatus {
+  id: string;
+  status: ResponseStatus;
+  output_text?: string;
+  output?: ResponseOutputItem[];
+  // Progress info extracted from output items
+  sourcesFound?: number;
+  searchesCompleted?: number;
+}
+
+// Responses API result wrapper
+export interface ResponsesResult {
+  id: string;
+  status: ResponseStatus;
+  output_text: string;
+  output: ResponseOutputItem[];
+  model: string;
+  usage?: {
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+  };
 }

@@ -9,6 +9,10 @@ import {
   GeneratedImage,
   ImageStreamEvent,
   ImageInput,
+  DeepResearchOptions,
+  DeepResearchResponse,
+  DeepResearchStatus,
+  ResponsesTool,
 } from '../types';
 
 export class OpenAIProvider implements LLMProvider {
@@ -21,47 +25,240 @@ export class OpenAIProvider implements LLMProvider {
     });
   }
 
-  async chat(messages: ChatMessage[], options: ChatOptions = {}): Promise<ChatResponse> {
-    const response = await this.client.chat.completions.create({
-      model: options.model || 'gpt-5-mini',
-      messages: messages.map(m => ({
-        role: m.role,
-        content: m.content,
-      })),
-      temperature: options.temperature ?? 0.7,
-      max_tokens: options.maxTokens,
-      response_format: options.responseFormat === 'json' ? { type: 'json_object' } : undefined,
+  /**
+   * Format messages for the Responses API input
+   */
+  private formatMessagesForResponses(messages: ChatMessage[]): string {
+    // For simple cases, concatenate messages with role prefixes
+    // The Responses API accepts a string or structured input
+    const parts: string[] = [];
+    
+    for (const msg of messages) {
+      if (msg.role === 'system') {
+        // System messages are handled via instructions parameter
+        continue;
+      } else if (msg.role === 'user') {
+        parts.push(msg.content);
+      } else if (msg.role === 'assistant') {
+        parts.push(`Assistant: ${msg.content}`);
+      }
+    }
+    
+    return parts.join('\n\n');
+  }
+
+  /**
+   * Extract system message for use as instructions
+   */
+  private extractSystemMessage(messages: ChatMessage[]): string | undefined {
+    const systemMsg = messages.find(m => m.role === 'system');
+    return systemMsg?.content;
+  }
+
+  /**
+   * Convert our tool format to OpenAI Responses API format
+   */
+  private formatToolsForResponses(tools?: ResponsesTool[]): unknown[] | undefined {
+    if (!tools || tools.length === 0) return undefined;
+    
+    return tools.map(tool => {
+      if (tool.type === 'function' && tool.function) {
+        return {
+          type: 'function',
+          function: tool.function,
+        };
+      }
+      // web_search_preview, file_search, mcp, code_interpreter pass through
+      return tool;
     });
+  }
+
+  /**
+   * Chat using the Responses API
+   * This replaces the Chat Completions API for better tool support
+   */
+  async chat(messages: ChatMessage[], options: ChatOptions = {}): Promise<ChatResponse> {
+    const input = this.formatMessagesForResponses(messages);
+    const instructions = options.instructions || this.extractSystemMessage(messages);
+    
+    // Build request parameters
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const requestParams: any = {
+      model: options.model || 'gpt-5-mini',
+      input,
+    };
+
+    // Add optional parameters
+    if (instructions) {
+      requestParams.instructions = instructions;
+    }
+    
+    if (options.reasoning) {
+      requestParams.reasoning = options.reasoning;
+    }
+    
+    if (options.verbosity) {
+      requestParams.text = { verbosity: options.verbosity };
+    }
+    
+    if (options.tools && options.tools.length > 0) {
+      requestParams.tools = this.formatToolsForResponses(options.tools);
+    }
+    
+    if (options.maxTokens) {
+      requestParams.max_output_tokens = options.maxTokens;
+    }
+
+    console.log(`[OpenAI] Responses API call with model=${requestParams.model}`);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await (this.client as any).responses.create(requestParams);
+
+    // Extract tool calls from output if present
+    const toolCalls = response.output
+      ?.filter((item: { type: string }) => item.type === 'function_call' || item.type === 'tool_use')
+      ?.map((item: { type: string; name?: string; arguments?: unknown }) => ({
+        type: item.type,
+        name: item.name,
+        arguments: item.arguments,
+      }));
 
     return {
-      content: response.choices[0]?.message?.content || '',
-      model: response.model,
+      content: response.output_text || '',
+      model: response.model || requestParams.model,
+      responseId: response.id,
       usage: response.usage ? {
-        promptTokens: response.usage.prompt_tokens,
-        completionTokens: response.usage.completion_tokens,
-        totalTokens: response.usage.total_tokens,
+        promptTokens: response.usage.input_tokens || 0,
+        completionTokens: response.usage.output_tokens || 0,
+        totalTokens: response.usage.total_tokens || 0,
       } : undefined,
+      toolCalls: toolCalls?.length > 0 ? toolCalls : undefined,
     };
   }
 
+  /**
+   * Streaming chat using the Responses API
+   */
   async *streamChat(messages: ChatMessage[], options: ChatOptions = {}): AsyncGenerator<string, void, unknown> {
-    const stream = await this.client.chat.completions.create({
+    const input = this.formatMessagesForResponses(messages);
+    const instructions = options.instructions || this.extractSystemMessage(messages);
+    
+    // Build request parameters
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const requestParams: any = {
       model: options.model || 'gpt-5-mini',
-      messages: messages.map(m => ({
-        role: m.role,
-        content: m.content,
-      })),
-      temperature: options.temperature ?? 0.7,
-      max_tokens: options.maxTokens,
+      input,
       stream: true,
-    });
+    };
 
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content;
-      if (content) {
-        yield content;
+    if (instructions) {
+      requestParams.instructions = instructions;
+    }
+    
+    if (options.reasoning) {
+      requestParams.reasoning = options.reasoning;
+    }
+    
+    if (options.verbosity) {
+      requestParams.text = { verbosity: options.verbosity };
+    }
+    
+    if (options.tools && options.tools.length > 0) {
+      requestParams.tools = this.formatToolsForResponses(options.tools);
+    }
+    
+    if (options.maxTokens) {
+      requestParams.max_output_tokens = options.maxTokens;
+    }
+
+    console.log(`[OpenAI] Responses API streaming call with model=${requestParams.model}`);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const stream = await (this.client as any).responses.create(requestParams);
+
+    for await (const event of stream) {
+      // Handle different event types from Responses API streaming
+      if (event.type === 'response.output_text.delta') {
+        yield event.delta || '';
+      } else if (event.type === 'response.text.delta') {
+        yield event.delta || '';
+      } else if (event.delta) {
+        // Fallback for any delta content
+        yield event.delta;
       }
     }
+  }
+
+  /**
+   * Deep research using o3-deep-research model
+   * Uses background mode for long-running requests (up to 30 minutes)
+   */
+  async deepResearch(input: string, options: DeepResearchOptions = {}): Promise<DeepResearchResponse> {
+    console.log(`[OpenAI] Starting deep research with background=${options.background ?? true}`);
+    
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const requestParams: any = {
+      model: 'o3-deep-research',
+      input,
+      background: options.background ?? true,  // Default to background mode
+      tools: [
+        { type: 'web_search_preview' },  // Always enable web search for research
+      ],
+    };
+
+    if (options.instructions) {
+      requestParams.instructions = options.instructions;
+    }
+
+    if (options.maxToolCalls) {
+      requestParams.max_tool_calls = options.maxToolCalls;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await (this.client as any).responses.create(requestParams);
+
+    console.log(`[OpenAI] Deep research job created: ${response.id}, status: ${response.status}`);
+
+    return {
+      id: response.id,
+      status: response.status,
+      output_text: response.output_text,
+      output: response.output,
+    };
+  }
+
+  /**
+   * Get status of a background response (for polling deep research jobs)
+   */
+  async getResponseStatus(responseId: string): Promise<DeepResearchStatus> {
+    console.log(`[OpenAI] Checking response status for: ${responseId}`);
+    
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await (this.client as any).responses.retrieve(responseId);
+
+    // Count web search calls and sources found from output
+    let sourcesFound = 0;
+    let searchesCompleted = 0;
+    
+    if (response.output) {
+      for (const item of response.output) {
+        if (item.type === 'web_search_call') {
+          searchesCompleted++;
+          if (item.status === 'completed') {
+            sourcesFound++;
+          }
+        }
+      }
+    }
+
+    return {
+      id: response.id,
+      status: response.status,
+      output_text: response.output_text,
+      output: response.output,
+      sourcesFound,
+      searchesCompleted,
+    };
   }
 
   async embed(text: string | string[], options: EmbeddingOptions = {}): Promise<number[][]> {

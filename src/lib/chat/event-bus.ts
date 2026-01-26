@@ -140,6 +140,7 @@ export class AgentEventBus {
   private eventToDbRecord(event: AgentEvent, idx: number): typeof chatAgentEvents.$inferInsert {
     const base = {
       runId: event.runId,
+      sessionId: event.sessionId || null,  // Include sessionId for historical trace retrieval
       idx,
       eventType: event.type,
       createdAt: new Date(event.timestamp || Date.now()),

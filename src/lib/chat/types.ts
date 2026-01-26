@@ -46,6 +46,9 @@ export type AgentEventType =
   | 'clarification_requested'
   | 'clarification_answered'
   | 'research_job_created'
+  | 'research_progress'
+  | 'research_source_found'
+  | 'research_complete'
   // Content generation
   | 'image_generated'
   | 'image_edited'
@@ -63,6 +66,7 @@ export type AgentEventType =
 // Base agent event
 interface BaseAgentEvent {
   runId: string;
+  sessionId?: string;  // Optional session ID for historical trace retrieval
   timestamp?: number;
 }
 
@@ -223,6 +227,33 @@ export interface ResearchJobCreatedEvent extends BaseAgentEvent {
   estimatedDuration?: string;
 }
 
+export interface ResearchProgressEvent extends BaseAgentEvent {
+  type: 'research_progress';
+  jobId: string;
+  status: 'queued' | 'in_progress' | 'completed' | 'failed';
+  message: string;
+  searchesCompleted?: number;
+  sourcesFound?: number;
+  progressPercent?: number;
+}
+
+export interface ResearchSourceFoundEvent extends BaseAgentEvent {
+  type: 'research_source_found';
+  jobId: string;
+  url: string;
+  title?: string;
+  snippet?: string;
+}
+
+export interface ResearchCompleteEvent extends BaseAgentEvent {
+  type: 'research_complete';
+  jobId: string;
+  totalSources: number;
+  totalSearches: number;
+  durationMs: number;
+  reportLength: number;
+}
+
 // ============================================
 // CONTENT GENERATION EVENTS
 // ============================================
@@ -333,6 +364,9 @@ export type AgentEvent =
   | ClarificationRequestedEvent
   | ClarificationAnsweredEvent
   | ResearchJobCreatedEvent
+  | ResearchProgressEvent
+  | ResearchSourceFoundEvent
+  | ResearchCompleteEvent
   // Content generation
   | ImageGeneratedEvent
   | ImageEditedEvent

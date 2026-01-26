@@ -11,6 +11,9 @@ import {
   ImageGenerationOptions,
   ImageStreamEvent,
   GeneratedImage,
+  DeepResearchOptions,
+  DeepResearchResponse,
+  DeepResearchStatus,
 } from './types';
 import { getModelConfig } from './config';
 
@@ -171,6 +174,54 @@ export async function uploadImageFile(
   }
   
   return provider.uploadFile(file, filename, mimeType);
+}
+
+/**
+ * Start a deep research job using o3-deep-research model
+ * Uses background mode for long-running requests (can take 20-30 minutes)
+ * 
+ * @param input - The research query/topic
+ * @param options - Deep research options
+ * @returns Response with job ID and initial status
+ */
+export async function deepResearch(
+  input: string,
+  options: DeepResearchOptions = {}
+): Promise<DeepResearchResponse> {
+  const config = await getModelConfig('research');
+  const provider = getProvider(config.provider);
+  
+  if (!provider.deepResearch) {
+    throw new Error(`Provider ${config.provider} does not support deep research`);
+  }
+  
+  // Merge config options with provided options
+  const mergedOptions: DeepResearchOptions = {
+    ...options,
+    instructions: options.instructions || (config.config as { instructions?: string })?.instructions,
+  };
+  
+  return provider.deepResearch(input, mergedOptions);
+}
+
+/**
+ * Get the status of a deep research job
+ * Use this to poll for completion of background research jobs
+ * 
+ * @param responseId - The response ID from deepResearch()
+ * @returns Current status and any available output
+ */
+export async function getDeepResearchStatus(
+  responseId: string
+): Promise<DeepResearchStatus> {
+  const config = await getModelConfig('research');
+  const provider = getProvider(config.provider);
+  
+  if (!provider.getResponseStatus) {
+    throw new Error(`Provider ${config.provider} does not support response status checking`);
+  }
+  
+  return provider.getResponseStatus(responseId);
 }
 
 // Re-export types
