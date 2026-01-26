@@ -280,8 +280,10 @@ export class OpenAIProvider implements LLMProvider {
   async generateImage(prompt: string, options: ImageGenerationOptions = {}): Promise<GeneratedImage> {
     const size = options.size || '1024x1024';
     const quality = options.quality || 'medium';
+    const outputFormat = options.outputFormat || 'png';
+    const background = options.background || 'opaque';
     
-    console.log(`[OpenAI] Generating image with model=${options.model || 'gpt-image-1.5'}, size=${size}, quality=${quality}`);
+    console.log(`[OpenAI] Generating image with model=${options.model || 'gpt-image-1.5'}, size=${size}, quality=${quality}, format=${outputFormat}`);
     
     try {
       // Check if this is an edit operation with input images
@@ -290,6 +292,7 @@ export class OpenAIProvider implements LLMProvider {
       }
       
       // Standard text-to-image generation using images.generate()
+      // GPT image models always return base64 (no response_format needed)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const response = await this.client.images.generate({
         model: options.model || 'gpt-image-1.5',
@@ -297,6 +300,8 @@ export class OpenAIProvider implements LLMProvider {
         n: 1,
         size: size as '1024x1024' | '1536x1024' | '1024x1536',
         quality: quality as 'low' | 'medium' | 'high',
+        output_format: outputFormat,
+        background: background,
       } as any);
 
       if (!response.data || response.data.length === 0) {
@@ -305,19 +310,18 @@ export class OpenAIProvider implements LLMProvider {
 
       const imageData = response.data[0];
       
-      // Handle both URL and base64 response formats
+      // GPT image models always return base64
       const imageBase64 = imageData.b64_json || '';
-      const imageUrl = imageData.url;
       
-      console.log(`[OpenAI] Image generated successfully. Has b64: ${!!imageData.b64_json}, Has URL: ${!!imageData.url}`);
+      console.log(`[OpenAI] Image generated successfully. Has b64: ${!!imageData.b64_json}, size: ${imageBase64.length} chars`);
 
       return {
-        imageBase64: imageBase64 || (imageUrl ? `URL:${imageUrl}` : ''),
+        imageBase64,
         revisedPrompt: imageData.revised_prompt,
         action: 'generate',
         size,
         quality,
-        background: options.background || 'opaque',
+        background,
       };
     } catch (error) {
       console.error('[OpenAI] Image generation failed:', error);
@@ -334,8 +338,12 @@ export class OpenAIProvider implements LLMProvider {
     }
 
     const inputImage = options.inputImages[0];
+    const size = options.size || '1024x1024';
+    const quality = options.quality || 'medium';
+    const outputFormat = options.outputFormat || 'png';
+    const background = options.background || 'opaque';
     
-    console.log(`[OpenAI] Editing image with type=${inputImage.type}`);
+    console.log(`[OpenAI] Editing image with type=${inputImage.type}, size=${size}, format=${outputFormat}`);
     
     // Convert input image to File object for the API
     let imageFile: File;
@@ -360,7 +368,10 @@ export class OpenAIProvider implements LLMProvider {
       image: imageFile,
       prompt,
       n: 1,
-      size: (options.size || '1024x1024') as '1024x1024',
+      size: size as '1024x1024' | '1536x1024' | '1024x1536',
+      quality: quality as 'low' | 'medium' | 'high',
+      output_format: outputFormat,
+      background: background,
     } as any);
 
     if (!response.data || response.data.length === 0) {
@@ -373,9 +384,9 @@ export class OpenAIProvider implements LLMProvider {
       imageBase64: imageData.b64_json || '',
       revisedPrompt: imageData.revised_prompt,
       action: 'edit',
-      size: options.size || '1024x1024',
-      quality: options.quality || 'medium',
-      background: options.background || 'opaque',
+      size,
+      quality,
+      background,
     };
   }
 
@@ -389,8 +400,12 @@ export class OpenAIProvider implements LLMProvider {
   ): AsyncGenerator<ImageStreamEvent, void, unknown> {
     const size = options.size || '1024x1024';
     const quality = options.quality || 'medium';
+    const outputFormat = options.outputFormat || 'png';
+    const background = options.background || 'opaque';
+    // partial_images is REQUIRED for streaming - must be 1-3
+    const partialImages = options.partialImages || 2;
     
-    console.log(`[OpenAI] Starting streaming image generation with model=${options.model || 'gpt-image-1.5'}, size=${size}, quality=${quality}`);
+    console.log(`[OpenAI] Starting streaming image generation with model=${options.model || 'gpt-image-1.5'}, size=${size}, quality=${quality}, partialImages=${partialImages}`);
     
     try {
       // Check if this is an edit operation - fall back to non-streaming for edits
@@ -417,6 +432,9 @@ export class OpenAIProvider implements LLMProvider {
         n: 1,
         size: size as '1024x1024' | '1536x1024' | '1024x1536',
         quality: quality as 'low' | 'medium' | 'high',
+        output_format: outputFormat,
+        background: background,
+        partial_images: partialImages,
         stream: true,
       } as any);
 
@@ -425,25 +443,47 @@ export class OpenAIProvider implements LLMProvider {
       console.log('[OpenAI] Stream started, waiting for events...');
       
       for await (const event of stream) {
-        console.log(`[OpenAI] Received stream event:`, Object.keys(event));
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const evt = event as any;
+        console.log(`[OpenAI] Received stream event type: ${evt.type}`);
         
-        // Check if this is a partial image event
-        if ('partial_image_index' in event) {
+        // Check event type per OpenAI API spec
+        if (evt.type === 'image_generation.partial_image') {
           partialCount++;
-          console.log(`[OpenAI] Partial image ${event.partial_image_index} received`);
+          console.log(`[OpenAI] Partial image ${evt.partial_image_index} received`);
           yield {
             type: 'partial',
-            partialImageIndex: event.partial_image_index,
-            imageBase64: event.b64_json,
+            partialImageIndex: evt.partial_image_index,
+            imageBase64: evt.b64_json,
             progress: Math.min(90, partialCount * 30),
           };
-        } else if ('b64_json' in event) {
+        } else if (evt.type === 'image_generation.completed') {
           // Completed event
           console.log('[OpenAI] Final image received');
           yield {
             type: 'complete',
-            imageBase64: event.b64_json,
-            revisedPrompt: event.revised_prompt,
+            imageBase64: evt.b64_json,
+            revisedPrompt: evt.revised_prompt,
+            action: 'generate',
+            progress: 100,
+          };
+        } else if ('partial_image_index' in evt) {
+          // Fallback for legacy event format
+          partialCount++;
+          console.log(`[OpenAI] Partial image (legacy) ${evt.partial_image_index} received`);
+          yield {
+            type: 'partial',
+            partialImageIndex: evt.partial_image_index,
+            imageBase64: evt.b64_json,
+            progress: Math.min(90, partialCount * 30),
+          };
+        } else if ('b64_json' in evt && !evt.type) {
+          // Fallback for legacy completed event
+          console.log('[OpenAI] Final image (legacy) received');
+          yield {
+            type: 'complete',
+            imageBase64: evt.b64_json,
+            revisedPrompt: evt.revised_prompt,
             action: 'generate',
             progress: 100,
           };

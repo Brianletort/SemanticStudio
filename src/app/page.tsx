@@ -507,7 +507,7 @@ export default function ChatPage() {
       setIsLoading(false);
       setImageMode(false);
     }
-  }, [sessionId, mode, webEnabled, attachments]);
+  }, [sessionId, mode, webEnabled, attachments, tracePaneOpen]);
 
   const handleFileSelect = useCallback(async (files: FileList) => {
     // Process each file asynchronously

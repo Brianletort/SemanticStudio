@@ -54,6 +54,32 @@ const mockDeepResearchComplete = {
   ],
 };
 
+// Helper to create async iterable for streaming tests
+async function* createStreamingMock(events: unknown[]): AsyncGenerator<unknown, void, unknown> {
+  for (const event of events) {
+    yield event;
+  }
+}
+
+// Default streaming events that simulate OpenAI's image streaming API
+const defaultStreamingEvents = [
+  {
+    type: 'image_generation.partial_image',
+    partial_image_index: 0,
+    b64_json: MOCK_IMAGE_BASE64.substring(0, 50),
+  },
+  {
+    type: 'image_generation.partial_image',
+    partial_image_index: 1,
+    b64_json: MOCK_IMAGE_BASE64.substring(0, 100),
+  },
+  {
+    type: 'image_generation.completed',
+    b64_json: MOCK_IMAGE_BASE64,
+    revised_prompt: 'A beautiful streamed image',
+  },
+];
+
 // Mock functions that we can control
 const mockImagesGenerate = vi.fn().mockResolvedValue(mockImageGenerationResponse);
 const mockImagesEdit = vi.fn().mockResolvedValue(mockImageGenerationResponse);
@@ -150,7 +176,7 @@ describe('OpenAIProvider', () => {
   });
 
   describe('generateImage', () => {
-    it('should generate an image with default options', async () => {
+    it('should generate an image with default options including output_format and background', async () => {
       const prompt = 'a simple red circle on white background';
       
       const result = await provider.generateImage(prompt);
@@ -162,12 +188,15 @@ describe('OpenAIProvider', () => {
           n: 1,
           size: '1024x1024',
           quality: 'medium',
+          output_format: 'png',
+          background: 'opaque',
         })
       );
       expect(result.imageBase64).toBe(MOCK_IMAGE_BASE64);
       expect(result.action).toBe('generate');
       expect(result.size).toBe('1024x1024');
       expect(result.quality).toBe('medium');
+      expect(result.background).toBe('opaque');
     });
 
     it('should generate an image with custom quality', async () => {
@@ -248,6 +277,32 @@ describe('OpenAIProvider', () => {
       );
     });
 
+    it('should pass transparent background when specified', async () => {
+      const prompt = 'a transparent image';
+      const options: ImageGenerationOptions = { background: 'transparent' };
+      
+      await provider.generateImage(prompt, options);
+      
+      expect(mockImagesGenerate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          background: 'transparent',
+        })
+      );
+    });
+
+    it('should pass custom output_format when specified', async () => {
+      const prompt = 'a webp image';
+      const options: ImageGenerationOptions = { outputFormat: 'webp' };
+      
+      await provider.generateImage(prompt, options);
+      
+      expect(mockImagesGenerate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          output_format: 'webp',
+        })
+      );
+    });
+
     it('should throw on API error', async () => {
       const apiError = new Error('API rate limit exceeded');
       mockImagesGenerate.mockRejectedValueOnce(apiError);
@@ -269,26 +324,83 @@ describe('OpenAIProvider', () => {
   });
 
   describe('generateImageStream', () => {
-    it('should yield progress events and complete event', async () => {
+    beforeEach(() => {
+      // Setup streaming mock to return an async iterable
+      mockImagesGenerate.mockImplementation((params: { stream?: boolean }) => {
+        if (params.stream) {
+          return createStreamingMock(defaultStreamingEvents);
+        }
+        return Promise.resolve(mockImageGenerationResponse);
+      });
+    });
+
+    it('should include partial_images, output_format, and background in streaming request', async () => {
       const prompt = 'a streamed image';
-      const events: Array<{ type: string; progress?: number; imageBase64?: string }> = [];
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for await (const _event of provider.generateImageStream(prompt)) {
+        // consume events
+      }
+      
+      expect(mockImagesGenerate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stream: true,
+          partial_images: 2,
+          output_format: 'png',
+          background: 'opaque',
+        })
+      );
+    });
+
+    it('should yield partial and complete events from stream', async () => {
+      const prompt = 'a streamed image';
+      const events: Array<{ type: string; progress?: number; imageBase64?: string; partialImageIndex?: number }> = [];
       
       for await (const event of provider.generateImageStream(prompt)) {
         events.push(event);
       }
       
-      // Should have progress events and a complete event
+      // Should have partial events and a complete event
       expect(events.length).toBeGreaterThan(1);
       
-      // Check for progress events
-      const progressEvents = events.filter(e => e.type === 'progress');
-      expect(progressEvents.length).toBeGreaterThan(0);
+      // Check for partial events
+      const partialEvents = events.filter(e => e.type === 'partial');
+      expect(partialEvents.length).toBe(2);
+      expect(partialEvents[0].partialImageIndex).toBe(0);
+      expect(partialEvents[1].partialImageIndex).toBe(1);
       
       // Check for complete event
       const completeEvent = events.find(e => e.type === 'complete');
       expect(completeEvent).toBeDefined();
       expect(completeEvent?.imageBase64).toBe(MOCK_IMAGE_BASE64);
       expect(completeEvent?.progress).toBe(100);
+    });
+
+    it('should use custom partialImages value when specified', async () => {
+      const options: ImageGenerationOptions = { partialImages: 3 };
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for await (const _event of provider.generateImageStream('test', options)) {
+        // consume events
+      }
+      
+      expect(mockImagesGenerate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          partial_images: 3,
+        })
+      );
+    });
+
+    it('should pass transparent background when specified', async () => {
+      const options: ImageGenerationOptions = { background: 'transparent' };
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for await (const _event of provider.generateImageStream('test', options)) {
+        // consume events
+      }
+      
+      expect(mockImagesGenerate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          background: 'transparent',
+        })
+      );
     });
 
     it('should yield error event on failure', async () => {
@@ -302,6 +414,23 @@ describe('OpenAIProvider', () => {
       const errorEvent = events.find(e => e.type === 'error');
       expect(errorEvent).toBeDefined();
       expect(errorEvent?.error).toBe('Generation failed');
+    });
+
+    it('should handle legacy event format as fallback', async () => {
+      // Mock with legacy format (no type field)
+      const legacyEvents = [
+        { partial_image_index: 0, b64_json: 'partial1' },
+        { b64_json: MOCK_IMAGE_BASE64, revised_prompt: 'Final image' },
+      ];
+      mockImagesGenerate.mockImplementationOnce(() => createStreamingMock(legacyEvents));
+      
+      const events: Array<{ type: string }> = [];
+      for await (const event of provider.generateImageStream('test')) {
+        events.push(event);
+      }
+      
+      expect(events.some(e => e.type === 'partial')).toBe(true);
+      expect(events.some(e => e.type === 'complete')).toBe(true);
     });
   });
 
