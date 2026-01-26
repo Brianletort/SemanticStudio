@@ -153,6 +153,14 @@ Self-learning pipelines with Plan-Act-Reflect (PAR) loop for reliable data inges
   <img src="docs/images/admin-etl.png" alt="ETL Pipelines" width="800">
 </p>
 
+### Usage Analytics & Observability
+
+Monitor user engagement, question patterns, response quality, and system performance.
+
+<p align="center">
+  <img src="docs/images/admin-observability.png" alt="Observability Dashboard" width="800">
+</p>
+
 ---
 
 ## Quick Start

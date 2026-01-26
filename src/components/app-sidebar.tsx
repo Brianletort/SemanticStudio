@@ -26,6 +26,7 @@ import {
   Home,
   Bot,
   Network,
+  Eye,
 } from "lucide-react";
 
 const chatItems = [
@@ -35,6 +36,7 @@ const chatItems = [
 
 const adminItems = [
   { title: "Dashboard", url: "/admin", icon: Home },
+  { title: "Observability", url: "/admin/observability", icon: Eye },
   { title: "Domain Agents", url: "/admin/agents", icon: Bot },
   { title: "Model Config", url: "/admin/models", icon: Cpu },
   { title: "Mode Config", url: "/admin/modes", icon: Settings2 },
