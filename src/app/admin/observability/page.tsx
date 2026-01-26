@@ -321,9 +321,16 @@ export default function ObservabilityPage() {
     return "bg-green-600 dark:bg-green-500";
   };
 
-  const formatQualityScore = (score: number | null) => {
+  // Format 0-1 scale scores as percentages
+  const formatPercentScore = (score: number | null) => {
     if (score === null) return "N/A";
     return (score * 100).toFixed(0) + "%";
+  };
+
+  // Format 1-5 scale quality score
+  const formatQualityScore = (score: number | null) => {
+    if (score === null) return "N/A";
+    return `${score.toFixed(1)}/5`;
   };
 
   const getModeColor = (mode: string | null) => {
@@ -401,7 +408,7 @@ export default function ObservabilityPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold">
-                  {stats?.avgQualityScore ? `${(stats.avgQualityScore * 100).toFixed(0)}%` : "N/A"}
+                  {stats?.avgQualityScore ? formatQualityScore(stats.avgQualityScore) : "N/A"}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   from {stats?.totalEvaluations || 0} evaluations
@@ -1074,19 +1081,19 @@ export default function ObservabilityPage() {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                         <div>
                           <div className="text-muted-foreground">Relevance</div>
-                          <div className="font-medium">{formatQualityScore(selectedSession.evaluation.relevanceScore)}</div>
+                          <div className="font-medium">{formatPercentScore(selectedSession.evaluation.relevanceScore)}</div>
                         </div>
                         <div>
                           <div className="text-muted-foreground">Groundedness</div>
-                          <div className="font-medium">{formatQualityScore(selectedSession.evaluation.groundednessScore)}</div>
+                          <div className="font-medium">{formatPercentScore(selectedSession.evaluation.groundednessScore)}</div>
                         </div>
                         <div>
                           <div className="text-muted-foreground">Coherence</div>
-                          <div className="font-medium">{formatQualityScore(selectedSession.evaluation.coherenceScore)}</div>
+                          <div className="font-medium">{formatPercentScore(selectedSession.evaluation.coherenceScore)}</div>
                         </div>
                         <div>
                           <div className="text-muted-foreground">Completeness</div>
-                          <div className="font-medium">{formatQualityScore(selectedSession.evaluation.completenessScore)}</div>
+                          <div className="font-medium">{formatPercentScore(selectedSession.evaluation.completenessScore)}</div>
                         </div>
                       </div>
                       {selectedSession.evaluation.hallucinationDetected && (
