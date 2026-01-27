@@ -1,7 +1,7 @@
 <p align="center">
   <h1 align="center">AgentKit</h1>
   <p align="center">
-    An open-source, data-first multi-agent chat platform with configurable domain agents, multiple LLM provider support, and self-learning ETL pipelines.
+    An enterprise-ready, data-first multi-agent chat platform with configurable domain agents, multiple LLM provider support, and self-learning ETL pipelines.
   </p>
 </p>
 
@@ -32,38 +32,91 @@
 
 AgentKit is a production-ready multi-agent chat platform that enables intelligent conversations across your organization's data. It combines the power of modern LLMs with a sophisticated domain agent architecture to provide contextual, accurate responses grounded in your data.
 
+**Why AgentKit?**
+
+- **Get running fast** — Clone, configure one API key, and have a working enterprise AI assistant in minutes
+- **Enterprise-class architecture** — Built for scale with PostgreSQL, vector search, and streaming responses
+- **Full observability** — Every step of reasoning is traced and visible in real-time
+- **Secure by design** — Role-based access, input validation, and no hardcoded secrets
+- **Extensible** — Add your own domain agents and integrations without changing core code
+
 **Key Capabilities:**
 
+- **Complete Chat Interface** with voice input, file attachments, image generation, and real-time trace panel
 - **28 Pre-configured Domain Agents** covering all business functions
-- **4 Chat Modes** (Quick, Think, Deep, Research) for different use cases
+- **4 Chat Modes** (Quick, Think, Deep, Research) with configurable pipelines
 - **3-Tier Memory System** for personalized, context-aware conversations
 - **GraphRAG-lite** for relationship discovery across your data
 - **Multi-provider LLM Support** (OpenAI, Anthropic, Ollama)
 - **Self-learning ETL Pipelines** with Plan-Act-Reflect pattern
 - **Task Agent Framework** for orchestrating human-in-loop and autonomous agent actions
+- **27 Reusable UI Components** built on Radix UI with Tailwind CSS
+- **45+ REST API Endpoints** for full programmatic control
+- **Full Observability** with 37 event types streamed in real-time
 
 ---
 
 ## Features
 
-### Multi-Agent Chat System
+### Complete Chat Interface
 
-Query across 28 domain agents that understand your business data. Each agent specializes in a specific domain and can be customized with your own data sources.
+A modern, responsive chat interface with everything you need for enterprise AI conversations.
+
+<p align="center">
+  <img src="docs/images/hero-chat.png" alt="Chat Interface" width="800">
+</p>
+
+| Feature | Description |
+|---------|-------------|
+| **Smart Text Input** | Auto-resizing textarea with keyboard shortcuts |
+| **Voice Input** | Speech-to-text via Web Speech API |
+| **File Attachments** | Drag & drop support for documents (PDF, DOCX, CSV, JSON) |
+| **Image Generation** | Create and edit images with AI directly in chat |
+| **Markdown Rendering** | Full markdown with syntax-highlighted code blocks |
+| **Session Management** | Folders, search, pin, and archive conversations |
+| **Real-time Trace Panel** | See every step of agent reasoning as it happens |
+| **Quality Scores** | Automatic response evaluation with hallucination detection |
+
+### Intelligent Mode Selection
+
+Four configurable modes with distinct processing pipelines, each optimized for different use cases.
 
 <p align="center">
   <img src="docs/images/chat-modes.png" alt="Chat Modes" width="600">
 </p>
 
-### Intelligent Mode Selection
+| Mode | Purpose | Depth | Speed |
+|------|---------|-------|-------|
+| **Quick** | Simple lookups, quick facts | Surface | Fast |
+| **Think** | Analysis, insights | Moderate | Balanced |
+| **Deep** | Comprehensive research | Deep | Thorough |
+| **Research** | Complex investigations | Exhaustive | Extended |
 
-| Mode | Best For | Speed | Depth |
-|------|----------|-------|-------|
-| **Quick** | Simple lookups, quick facts | Fast | Surface |
-| **Think** | Analysis, insights | Balanced | Moderate |
-| **Deep** | Comprehensive research | Thorough | Deep |
-| **Research** | Complex investigations | Extended | Exhaustive |
+Each mode controls:
+- Maximum results retrieved
+- Knowledge graph traversal depth (0-3 hops)
+- Which memory tiers are included
+- Whether reflection/self-critique is enabled
+- Which LLM model is used
+
+**All parameters are configurable via the admin UI without code changes.**
+
+### 27 Reusable UI Components
+
+A complete component library built on [Radix UI](https://www.radix-ui.com/) with [Tailwind CSS](https://tailwindcss.com/) styling. All components are accessible, themeable, and production-ready.
+
+| Category | Components |
+|----------|------------|
+| **Overlays** | Dialog, Alert Dialog, Sheet, Popover, Tooltip |
+| **Forms** | Input, Textarea, Select, Checkbox, Switch, Slider, Label |
+| **Data Display** | Table, Card, Badge, Avatar, Progress, Skeleton |
+| **Navigation** | Tabs, Command (⌘K), Dropdown Menu, Sidebar |
+| **Layout** | Separator, Scroll Area, Collapsible |
+| **Feedback** | Sonner (toasts), Button |
 
 ### Domain Agent Coverage
+
+28 pre-configured agents organized into 6 categories, each with custom system prompts and configurable data sources.
 
 <table>
 <tr>
@@ -130,13 +183,23 @@ Query across 28 domain agents that understand your business data. Each agent spe
 </tr>
 </table>
 
-### Admin Dashboard
+### Full Admin Dashboard
 
-Manage agents, configure models, visualize your knowledge graph, and monitor ETL pipelines—all from a unified admin interface.
+Manage every aspect of your AI assistant from a unified admin interface.
 
 <p align="center">
   <img src="docs/images/admin-dashboard.png" alt="Admin Dashboard" width="800">
 </p>
+
+| Section | Capabilities |
+|---------|--------------|
+| **Model Configuration** | Assign models to 9 different LLM roles |
+| **Domain Agents** | Create, edit, and configure agents without code |
+| **Mode Configuration** | Visual pipeline flow diagrams, parameter tuning |
+| **Data Sources** | Connect databases, files, APIs with semantic entity mapping |
+| **ETL Jobs** | Manage pipelines with execution history |
+| **Knowledge Graph** | Interactive 3D visualization |
+| **Observability** | Usage analytics, quality metrics, user activity |
 
 ### Knowledge Graph Visualization
 
@@ -154,23 +217,31 @@ Self-learning pipelines with Plan-Act-Reflect (PAR) loop for reliable data inges
   <img src="docs/images/admin-etl.png" alt="ETL Pipelines" width="800">
 </p>
 
+**Supported Sources:**
+- CSV files
+- JSON files
+- REST APIs
+- Database tables
+
+**Key Feature:** Lessons learned are stored and referenced in future runs, so pipelines improve over time.
+
 ### Usage Analytics & Observability
 
 Comprehensive observability dashboard for monitoring your AI assistant's performance and usage patterns.
 
-**Overview Dashboard** — Real-time stats on sessions, messages, quality scores, and mode distribution across quick, think, deep, and research modes.
+**Overview Dashboard** — Real-time stats on sessions, messages, quality scores, and mode distribution.
 
 <p align="center">
   <img src="docs/images/admin-observability.png" alt="Observability Overview" width="800">
 </p>
 
-**Quality Metrics** — Track response quality trends over time with relevance, groundedness, coherence, and completeness scores. Automatic hallucination detection alerts you to potential issues.
+**Quality Metrics** — Track response quality trends with relevance, groundedness, coherence, and completeness scores. Automatic hallucination detection alerts you to potential issues.
 
 <p align="center">
   <img src="docs/images/admin-observability-quality.png" alt="Quality Metrics" width="800">
 </p>
 
-**User Activity** — Deep dive into individual user sessions, question patterns, and domain agent utilization. Click any user to view their full conversation history with quality evaluations.
+**User Activity** — Deep dive into individual user sessions and domain agent utilization.
 
 <p align="center">
   <img src="docs/images/admin-observability-users.png" alt="User Activity" width="800">
@@ -178,7 +249,36 @@ Comprehensive observability dashboard for monitoring your AI assistant's perform
 
 ---
 
+## Event Bus & Full Observability
+
+Every action in the system emits events for complete traceability. **37 event types** covering:
+
+| Category | Events |
+|----------|--------|
+| **Pipeline** | `mode_classified`, `mode_selected`, `pipeline_started`, `pipeline_complete` |
+| **Retrieval** | `retrieval_started`, `retrieval_complete`, `domain_agent_started`, `domain_agent_complete` |
+| **Graph** | `graph_traversal_started`, `graph_traversal_complete` |
+| **Memory** | `memory_retrieved`, `memory_saved` |
+| **Quality** | `reflection_started`, `reflection_complete`, `judge_evaluation` |
+| **Task** | `task_requested`, `task_routed`, `task_pending_approval`, `task_approved`, `task_rejected`, `task_executing`, `task_result`, `task_failed` |
+| **Content** | `image_generated`, `image_edited`, `document_processed` |
+| **Web Search** | `web_search_started`, `web_search_complete` |
+| **Context** | `source_used`, `context_built` |
+
+All events are:
+- **Streamed to the UI in real-time** (visible in the trace panel)
+- **Persisted to the database** for historical analysis
+- **Correlated by run, session, and turn** for debugging
+
+<p align="center">
+  <img src="docs/images/reasoning-pane.png" alt="Reasoning Pane" width="600">
+</p>
+
+---
+
 ## Quick Start
+
+Get AgentKit running in under 5 minutes.
 
 ### Prerequisites
 
@@ -191,7 +291,7 @@ Comprehensive observability dashboard for monitoring your AI assistant's perform
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/your-org/agentkit.git
+   git clone https://github.com/Brianletort/AgentKit.git
    cd agentkit
    ```
 
@@ -228,13 +328,19 @@ Comprehensive observability dashboard for monitoring your AI assistant's perform
    OLLAMA_BASE_URL=http://localhost:11434
    ```
 
-5. **Start the development server**
+5. **Run database migrations**
+
+   ```bash
+   npm run db:migrate
+   ```
+
+6. **Start the development server**
 
    ```bash
    npm run dev
    ```
 
-6. **Open the app**
+7. **Open the app**
 
    Navigate to [http://localhost:3000](http://localhost:3000)
 
@@ -246,6 +352,48 @@ On first launch, AgentKit will:
 - Set up sample data for demonstration
 
 You can start chatting immediately or configure your own data sources through the Admin panel at `/admin`.
+
+### Connect Your Enterprise Data
+
+1. Navigate to **Admin → Data Sources** (`/admin/data`)
+2. Add your data sources:
+   - **Database**: PostgreSQL connection string + table/view selection
+   - **Files**: Upload CSV, JSON, or documents
+   - **APIs**: Configure REST endpoint with auth
+3. Create an **ETL Job** to import and process the data
+4. Run the job — AgentKit will extract entities and build the knowledge graph
+5. Link data sources to domain agents for querying
+
+### Production Deployment
+
+For production deployments:
+
+```bash
+# Build the application
+npm run build
+
+# Start production server
+npm start
+```
+
+**Environment variables for production:**
+
+```env
+NODE_ENV=production
+DATABASE_URL=postgresql://user:pass@host:5432/agentkit
+OPENAI_API_KEY=sk-...
+
+# Optional: Enable specific features
+BRAVE_API_KEY_AI_GROUNDING=...  # Web search
+AZURE_SEARCH_ENDPOINT=...       # Azure Cognitive Search
+```
+
+**Docker Deployment:**
+
+```bash
+docker build -t agentkit .
+docker run -p 3000:3000 --env-file .env.production agentkit
+```
 
 ---
 
@@ -272,6 +420,7 @@ flowchart TB
         MemorySystem[3-Tier Memory]
         DomainAgents[28 Domain Agents]
         GraphRAG[GraphRAG-lite]
+        EventBus[Event Bus]
     end
     
     subgraph LLM[LLM Providers]
@@ -293,6 +442,7 @@ flowchart TB
     DomainAgents --> GraphRAG
     Core --> LLM
     Core --> Storage
+    Core --> EventBus
 ```
 
 ### Request Flow
@@ -338,30 +488,25 @@ agentkit/
 │   │   ├── admin/              # Admin dashboard
 │   │   │   ├── agents/         # Agent management
 │   │   │   ├── models/         # Model configuration
+│   │   │   ├── modes/          # Mode pipeline config
 │   │   │   ├── graph/          # Knowledge graph viewer
 │   │   │   └── etl/            # ETL pipeline management
-│   │   └── api/                # REST API endpoints
+│   │   └── api/                # REST API endpoints (45+)
 │   │       ├── chat/           # Chat endpoint (SSE streaming)
 │   │       ├── agents/         # Agent CRUD
 │   │       ├── etl/            # ETL operations
-│   │       └── graph/          # Knowledge graph APIs
+│   │       ├── graph/          # Knowledge graph APIs
+│   │       ├── memories/       # Memory system APIs
+│   │       └── ...
 │   ├── lib/
 │   │   ├── agents/             # Task Agent Framework
-│   │   │   ├── types.ts        # Agent interfaces
-│   │   │   ├── registry.ts     # Agent registration
-│   │   │   └── executor.ts     # Task execution engine
-│   │   ├── chat/               # Chat orchestration
-│   │   │   ├── mode-classifier.ts
-│   │   │   ├── mode-config.ts
-│   │   │   └── orchestrator.ts
+│   │   ├── chat/               # Chat orchestration + Event Bus
 │   │   ├── llm/                # LLM provider abstraction
-│   │   │   └── providers/      # OpenAI, Anthropic, Ollama
 │   │   ├── memory/             # 3-tier memory system
 │   │   ├── retrieval/          # Domain retrieval
 │   │   ├── graph/              # GraphRAG-lite
-│   │   ├── semantic/           # Entity resolution
 │   │   └── etl/                # ETL pipeline system
-│   └── components/             # React UI components
+│   └── components/             # React UI components (27+)
 ├── docker/                     # Docker configuration
 ├── docs/                       # Documentation
 └── tests/                      # Test suites
@@ -392,15 +537,15 @@ Configure which models are used for each role via the Admin UI at `/admin/models
 
 | Role | Purpose | Default Model |
 |------|---------|---------------|
-| `composer` | Main response generation | gpt-5.2 |
-| `composer_fast` | Quick mode responses | gpt-5-mini |
-| `research` | Research mode (extended) | o3-deep-research |
-| `planner` | Query planning | gpt-5-mini |
-| `reflection` | Response improvement | gpt-5.2 |
-| `mode_classifier` | Auto mode detection | gpt-5-mini |
-| `memory_extractor` | Memory fact extraction | gpt-5-mini |
+| `composer` | Main response generation | gpt-4o |
+| `composer_fast` | Quick mode responses | gpt-4o-mini |
+| `research` | Research mode (extended) | o3-mini |
+| `planner` | Query planning | gpt-4o-mini |
+| `reflection` | Response improvement | gpt-4o |
+| `mode_classifier` | Auto mode detection | gpt-4o-mini |
+| `memory_extractor` | Memory fact extraction | gpt-4o-mini |
 | `embeddings` | Vector embeddings | text-embedding-3-large |
-| `image_generation` | Image creation | gpt-image-1.5 |
+| `image_generation` | Image creation | dall-e-3 |
 
 <p align="center">
   <img src="docs/images/admin-models.png" alt="Model Configuration" width="800">
@@ -420,161 +565,40 @@ Each mode has configurable parameters that can be customized per-user:
 
 ---
 
-## Customization
-
-### Adding Domain Agents
-
-Create new domain agents without code changes via the Admin UI or REST API.
-
-**Via Admin UI:**
-
-1. Navigate to `/admin/agents`
-2. Click "Create Agent"
-3. Configure name, description, category, and system prompt
-4. Link data sources
-
-<p align="center">
-  <img src="docs/images/admin-agents.png" alt="Agent Management" width="800">
-</p>
-
-**Via REST API:**
-
-```bash
-curl -X POST http://localhost:3000/api/agents \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "sustainability",
-    "displayName": "Sustainability",
-    "description": "Environmental metrics and ESG data",
-    "category": "operations",
-    "status": "active",
-    "systemPrompt": "You are a sustainability specialist..."
-  }'
-```
-
-### Connecting Data Sources
-
-1. Navigate to `/admin/data`
-2. Add data sources (database tables, APIs, files)
-3. Link to domain agents via the agent configuration
-
-Supported data sources:
-- PostgreSQL tables/views
-- CSV/JSON files
-- REST APIs
-- Document uploads (PDF, DOCX, XLSX)
-
-### Creating ETL Pipelines
-
-1. Navigate to `/admin/etl`
-2. Create a new job with source configuration
-3. Configure the PAR loop stages:
-   - **Plan**: Analyze source, determine extraction strategy
-   - **Act**: Execute extraction and transformation
-   - **Reflect**: Evaluate results, learn from errors
-
----
-
-## API Reference
-
-### Core Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/chat` | Main chat endpoint (SSE streaming) |
-| `GET` | `/api/sessions` | List chat sessions |
-| `POST` | `/api/sessions` | Create new session |
-| `GET` | `/api/agents` | List domain agents |
-| `POST` | `/api/agents` | Create domain agent |
-| `GET` | `/api/graph/data` | Get knowledge graph data |
-| `POST` | `/api/graph/build` | Build/rebuild knowledge graph |
-| `GET` | `/api/etl/jobs` | List ETL jobs |
-| `POST` | `/api/etl/jobs/{id}/run` | Execute ETL job |
-
-### Chat Request
-
-```typescript
-POST /api/chat
-Content-Type: application/json
-
-{
-  "message": "What are our top customers by revenue?",
-  "sessionId": "session-uuid",
-  "mode": "think",              // auto | quick | think | deep | research
-  "webSearchEnabled": false,
-  "memoryEnabled": true
-}
-```
-
-### Chat Response (SSE)
-
-The chat endpoint returns Server-Sent Events with the following event types:
-
-```typescript
-// Content chunks
-event: content
-data: {"content": "Based on the data..."}
-
-// Agent events (for tracing)
-event: agent_event  
-data: {"type": "domain_agent_started", "domain": "customer"}
-
-// Completion
-event: done
-data: {"messageId": "msg-uuid", "turnId": "turn-uuid"}
-```
-
-For complete API documentation, see the [API Reference](docs/api-reference.md).
-
----
-
-## Reasoning & Evaluation
-
-### Reasoning Pane
-
-Enable the reasoning pane to see how AgentKit processes your query:
-
-<p align="center">
-  <img src="docs/images/reasoning-pane.png" alt="Reasoning Pane" width="600">
-</p>
-
-The pane shows:
-- Mode classification decisions
-- Domain agent activations
-- Memory retrieval
-- GraphRAG traversal
-- Quality evaluation scores
-
-### Quality Evaluation
-
-Each response is automatically evaluated on:
-- **Relevance**: How well the response addresses the query
-- **Groundedness**: Whether claims are supported by retrieved data
-- **Coherence**: Logical flow and clarity
-- **Completeness**: Coverage of the query scope
-
----
-
 ## Memory System
 
-AgentKit implements a MemGPT-inspired 3-tier memory system:
+AgentKit implements a MemGPT-inspired 3-tier memory system for personalized, context-aware conversations.
 
-### Tier 1: Working Context
-- Recent conversation turns (last 3 exchanges)
-- Session summary (if enabled)
-- Always included in every request
+### Memory Tiers
 
-### Tier 2: Session Memory
-- Relevant past turns from current session
-- Session facts extracted by the memory extractor
-- Retrieved via vector similarity search
+| Tier | Scope | Contents |
+|------|-------|----------|
+| **Tier 1** | Working Context | Recent conversation turns (last 3 exchanges), session summary |
+| **Tier 2** | Session Memory | Relevant past turns from current session, extracted session facts |
+| **Tier 3** | Long-term Memory | User profile facts across all sessions, saved memories |
 
-### Tier 3: Long-term Memory
-- User profile facts across sessions
-- Saved memories (explicit user saves)
-- Cross-session knowledge
+### Fact Types Extracted
 
-Configure memory behavior in Settings → Memory Configuration.
+The memory system automatically extracts and categorizes facts from conversations:
+
+| Fact Type | Description | Example |
+|-----------|-------------|---------|
+| **Preferences** | Format, style, communication preferences | "User prefers bullet points over paragraphs" |
+| **Constraints** | Temporary filters | "Only interested in Texas customers" |
+| **Context** | Situational information | "Working on Q4 planning" |
+| **Topics** | What's being discussed | "Focused on revenue metrics" |
+| **Expertise** | User's knowledge areas | "Expert in financial modeling" |
+| **Goals** | User's objectives | "Trying to reduce churn by 10%" |
+
+### Configurable Extraction Modes
+
+| Mode | Description |
+|------|-------------|
+| **Conservative** | Only highly confident, explicit facts |
+| **Balanced** | Clear facts with moderate confidence (default) |
+| **Aggressive** | All potential facts including implicit ones |
+
+Configure memory behavior in **Settings → Memory Configuration**.
 
 ---
 
@@ -594,85 +618,12 @@ Traditional chatbots answer questions. AgentKit goes further by enabling **agent
 
 This transforms your AI assistant from an information retrieval system into an **intelligent automation platform**.
 
-### Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              CHAT SYSTEM                                     │
-│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐          │
-│  │   Chat Route    │───▶│   Orchestrator  │───▶│    Composer     │          │
-│  │   /api/chat     │    │                 │    │                 │          │
-│  └─────────────────┘    └────────┬────────┘    └─────────────────┘          │
-│                                  │                                           │
-│                                  │ (Task Invocation)                         │
-│                                  ▼                                           │
-│  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │                      TASK AGENT FRAMEWORK                              │  │
-│  │  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐   │  │
-│  │  │  Task Executor  │───▶│  Task Registry  │───▶│   Task Agents   │   │  │
-│  │  │                 │    │                 │    │                 │   │  │
-│  │  │ • Routing       │    │ • Registration  │    │ • Salesforce    │   │  │
-│  │  │ • Approval      │    │ • Discovery     │    │ • Calendar      │   │  │
-│  │  │ • Timeout/Retry │    │ • Capabilities  │    │ • Oracle        │   │  │
-│  │  └────────┬────────┘    └─────────────────┘    │ • Custom...     │   │  │
-│  │           │                                     └─────────────────┘   │  │
-│  │           ▼                                                           │  │
-│  │  ┌─────────────────┐                                                  │  │
-│  │  │   Event Bus     │◀──────────── All events for observability        │  │
-│  │  │ (Observability) │                                                  │  │
-│  │  └─────────────────┘                                                  │  │
-│  └───────────────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
 ### Two Execution Modes
 
 | Mode | Description | Use Case |
 |------|-------------|----------|
 | **Human-in-Loop** | Requires user approval before execution | Mutations, deletions, external API calls |
 | **Human-out-of-Loop** | Executes autonomously | Lookups, read-only queries, low-risk operations |
-
-### Human-in-Loop Workflow
-
-```
-User: "Update the Acme account status to Closed Won"
-         │
-         ▼
-┌──────────────────────────────┐
-│  LLM identifies task needed  │
-│  taskType: salesforce_update │
-└──────────┬───────────────────┘
-           │
-           ▼
-┌──────────────────────────────┐
-│  Task Executor routes to     │
-│  Salesforce Agent            │
-│  (human_in_loop mode)        │
-└──────────┬───────────────────┘
-           │
-           ▼
-┌──────────────────────────────┐
-│  Approval UI displayed       │
-│  "Update Acme: status →      │
-│   Closed Won"                │
-│  [Approve] [Reject]          │
-└──────────┬───────────────────┘
-           │
-     User clicks Approve
-           │
-           ▼
-┌──────────────────────────────┐
-│  Agent executes              │
-│  → Salesforce API call       │
-└──────────┬───────────────────┘
-           │
-           ▼
-┌──────────────────────────────┐
-│  Result returned to chat     │
-│  "✓ Acme updated to          │
-│   Closed Won"                │
-└──────────────────────────────┘
-```
 
 ### Key Capabilities
 
@@ -717,30 +668,114 @@ const salesforceAgent: TaskAgent = {
 taskRegistry.register(salesforceAgent);
 ```
 
-### Event Types
-
-| Event | Description |
-|-------|-------------|
-| `task_requested` | Task execution requested |
-| `task_routed` | Task routed to specific agent |
-| `task_pending_approval` | Awaiting human approval |
-| `task_approved` / `task_rejected` | Human decision |
-| `task_executing` | Agent is executing |
-| `task_result` / `task_failed` | Execution outcome |
-
 For complete documentation, see [docs/task-agent-framework.md](docs/task-agent-framework.md).
+
+---
+
+## Quality Evaluation System
+
+Every response is automatically evaluated on multiple dimensions:
+
+| Metric | Description |
+|--------|-------------|
+| **Relevance** | How well the response addresses the query |
+| **Groundedness** | Whether claims are supported by retrieved data |
+| **Coherence** | Logical flow and clarity |
+| **Completeness** | Coverage of the query scope |
+| **Hallucination Detection** | Flags unsupported claims |
+
+Scores are displayed in the UI and stored for trend analysis in the observability dashboard.
+
+---
+
+## Database Schema
+
+PostgreSQL 16 with pgvector extension for vector similarity search. The schema includes:
+
+| Category | Tables |
+|----------|--------|
+| **Chat History** | `chat_sessions`, `chat_messages` |
+| **Agent Configuration** | `domain_agents`, `agent_data_sources` |
+| **Data Sources** | `data_sources`, `semantic_entities` |
+| **Knowledge Graph** | `kg_nodes`, `kg_edges` |
+| **Event Bus** | `chat_agent_events` |
+| **Memory System** | `session_memories`, `user_memories`, `memory_facts` |
+| **ETL System** | `etl_jobs`, `etl_runs`, `etl_learned_knowledge` |
+| **Quality** | `evaluations` |
+| **Configuration** | `model_configs`, `mode_configs`, `user_settings` |
+
+---
+
+## API Reference
+
+### Core Endpoints (45+)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/chat` | Main chat endpoint (SSE streaming) |
+| `GET` | `/api/sessions` | List chat sessions |
+| `POST` | `/api/sessions` | Create new session |
+| `GET` | `/api/sessions/search` | Search sessions |
+| `GET` | `/api/agents` | List domain agents |
+| `POST` | `/api/agents` | Create domain agent |
+| `GET` | `/api/graph/data` | Get knowledge graph data |
+| `POST` | `/api/graph/build` | Build/rebuild knowledge graph |
+| `GET` | `/api/etl/jobs` | List ETL jobs |
+| `POST` | `/api/etl/jobs/{id}/run` | Execute ETL job |
+| `GET` | `/api/memories` | Get user memories |
+| `GET` | `/api/memories/facts` | Get extracted facts |
+| `GET` | `/api/trace/{turnId}` | Get events for a turn |
+| `POST` | `/api/images/generate` | Generate image |
+| `GET` | `/api/models` | List model configurations |
+| `PUT` | `/api/models/{role}` | Update model for role |
+| ... | ... | [See full API docs](docs/api-reference.md) |
+
+### Chat Request
+
+```typescript
+POST /api/chat
+Content-Type: application/json
+
+{
+  "message": "What are our top customers by revenue?",
+  "sessionId": "session-uuid",
+  "mode": "think",              // auto | quick | think | deep | research
+  "webSearchEnabled": false,
+  "memoryEnabled": true
+}
+```
+
+### Chat Response (SSE)
+
+The chat endpoint returns Server-Sent Events with the following event types:
+
+```typescript
+// Content chunks
+event: content
+data: {"content": "Based on the data..."}
+
+// Agent events (for tracing)
+event: agent_event  
+data: {"type": "domain_agent_started", "domain": "customer"}
+
+// Completion
+event: done
+data: {"messageId": "msg-uuid", "turnId": "turn-uuid"}
+```
+
+For complete API documentation, see the [API Reference](docs/api-reference.md).
 
 ---
 
 ## Technology Stack
 
-- **Frontend**: Next.js 16, React 19, Tailwind CSS 4, shadcn/ui
+- **Frontend**: Next.js 16, React 19, Tailwind CSS 4, shadcn/ui, Radix UI
 - **Backend**: Next.js API Routes, Node.js
 - **Database**: PostgreSQL 16 with pgvector
 - **ORM**: Drizzle ORM
 - **LLM Providers**: OpenAI, Anthropic, Ollama
 - **Search**: Brave Search, Azure Cognitive Search
-- **Visualization**: react-force-graph, Three.js
+- **Visualization**: react-force-graph (3D), Three.js, Recharts
 
 ---
 
@@ -757,6 +792,9 @@ npm run test:watch
 
 # Coverage report
 npm run test:coverage
+
+# E2E tests (Playwright)
+npm run test:e2e
 ```
 
 ### Database Migrations
@@ -800,6 +838,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 Built with:
 - [Next.js](https://nextjs.org/) - React framework
 - [shadcn/ui](https://ui.shadcn.com/) - UI components
+- [Radix UI](https://www.radix-ui.com/) - Accessible component primitives
 - [PostgreSQL](https://www.postgresql.org/) - Database
 - [pgvector](https://github.com/pgvector/pgvector) - Vector similarity search
 - [Drizzle ORM](https://orm.drizzle.team/) - TypeScript ORM
