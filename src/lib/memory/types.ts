@@ -1,10 +1,11 @@
 /**
  * Memory System Types - MemGPT-Style Multi-Tier Memory
  * 
- * Three-tier memory architecture:
+ * Four-tier memory architecture:
  * - Tier 1: Working Context (recent turns + session summary)
  * - Tier 2: Session Memory (relevant past turns + session facts)
  * - Tier 3: Long-term Memory (user profile facts across sessions)
+ * - Tier 4: Context Graph (entity links to domain knowledge graph)
  */
 
 // ============================================================================
