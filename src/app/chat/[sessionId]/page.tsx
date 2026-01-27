@@ -7,6 +7,7 @@ export default function SessionChatPage() {
   const params = useParams();
   const sessionId = params.sessionId as string;
 
-  // Use key prop to force remount when sessionId changes, ensuring clean state
-  return <ChatPageContent key={sessionId} initialSessionId={sessionId} />;
+  // Don't use key prop - it forces remount which breaks streaming callbacks
+  // Session changes are handled via useEffect state resets in ChatPageContent
+  return <ChatPageContent initialSessionId={sessionId} />;
 }

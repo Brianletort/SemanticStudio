@@ -59,7 +59,11 @@ export function ChatPageContent({ initialSessionId }: ChatPageContentProps) {
   const [effectiveMode, setEffectiveMode] = useState<Exclude<ChatMode, 'auto'>>('think');
 
   // Global store for tracking active sessions across navigation
-  const { registerActiveSession, unregisterActiveSession, isSessionActive } = useChatStore();
+  // Note: Only use action selectors here - don't subscribe to activeSessions directly
+  // as it causes re-renders during streaming that break the UI updates
+  const registerActiveSession = useChatStore((state) => state.registerActiveSession);
+  const unregisterActiveSession = useChatStore((state) => state.unregisterActiveSession);
+  const setSessionStreaming = useChatStore((state) => state.setSessionStreaming);
 
   // Load sessions on mount
   useEffect(() => {
@@ -144,6 +148,7 @@ export function ChatPageContent({ initialSessionId }: ChatPageContentProps) {
   }, []);
 
   // Load messages when initialSessionId changes
+  // Also reset trace/agent state to ensure clean state without remounting
   useEffect(() => {
     if (initialSessionId) {
       setSessionId(initialSessionId);
@@ -152,14 +157,42 @@ export function ChatPageContent({ initialSessionId }: ChatPageContentProps) {
       setSessionId(null);
       setMessages([]);
     }
+    // Reset trace state when session changes (replaces key-based remount)
+    setAgentEvents([]);
+    setModeClassification(null);
+    setCurrentTurnId(null);
   }, [initialSessionId, loadSessionMessages]);
 
-  // Restore loading state when navigating to an active session
+  // Restore and sync loading state when navigating to an active session
+  // Subscribe to streaming state changes so spinner stays in sync
   useEffect(() => {
-    if (sessionId && isSessionActive(sessionId)) {
+    if (!sessionId) return;
+    
+    // Check initial state
+    const session = useChatStore.getState().activeSessions.get(sessionId);
+    if (session?.isStreaming) {
       setIsLoading(true);
     }
-  }, [sessionId, isSessionActive]);
+    
+    // Subscribe to store changes to keep isLoading in sync with streaming state
+    const unsubscribe = useChatStore.subscribe((state) => {
+      const currentSession = state.activeSessions.get(sessionId);
+      const isStreaming = currentSession?.isStreaming ?? false;
+      
+      // When streaming stops, update local loading state
+      // This handles the case where streaming completes while viewing this session
+      // or when we navigate to a session that just finished streaming
+      if (!isStreaming && currentSession === undefined) {
+        // Session was completely unregistered - streaming is done
+        setIsLoading(false);
+      } else if (!isStreaming && currentSession !== undefined) {
+        // Session still registered but streaming stopped (between [DONE] and unregister)
+        setIsLoading(false);
+      }
+    });
+    
+    return () => unsubscribe();
+  }, [sessionId]);
 
   // Save a message to the session
   const saveMessage = async (sessionIdToSave: string, role: string, content: string, metadata?: Record<string, unknown>): Promise<string | null> => {
@@ -238,6 +271,7 @@ export function ChatPageContent({ initialSessionId }: ChatPageContentProps) {
 
     // Create session lazily on first message
     let currentSessionId = sessionId;
+    let shouldNavigateAfterStreaming = false;
     if (!currentSessionId) {
       const title = generateTitleFromMessage(message);
       const newId = await createSession(title);
@@ -247,8 +281,9 @@ export function ChatPageContent({ initialSessionId }: ChatPageContentProps) {
       }
       currentSessionId = newId;
       setSessionId(newId);
-      // Navigate to the new session URL
-      router.replace(`/chat/${newId}`);
+      // Don't navigate yet - it causes remount and breaks streaming
+      // We'll navigate after streaming completes
+      shouldNavigateAfterStreaming = true;
     }
 
     // Add user message
@@ -290,8 +325,12 @@ export function ChatPageContent({ initialSessionId }: ChatPageContentProps) {
     try {
       abortControllerRef.current = new AbortController();
       
-      // Register this session as active in global store
-      registerActiveSession(currentSessionId, abortControllerRef.current);
+      // Register this session as active in global store (non-critical)
+      try {
+        registerActiveSession(currentSessionId, abortControllerRef.current);
+      } catch (e) {
+        console.warn('Failed to register active session:', e);
+      }
 
       // Handle image generation mode
       if (imageSettings) {
@@ -354,7 +393,15 @@ export function ChatPageContent({ initialSessionId }: ChatPageContentProps) {
             for (const line of lines) {
               if (line.startsWith("data: ")) {
                 const data = line.slice(6);
-                if (data === "[DONE]") continue;
+                if (data === "[DONE]") {
+                  // Stream complete - update global store immediately
+                  try {
+                    setSessionStreaming(currentSessionId, false);
+                  } catch (e) {
+                    console.warn('Failed to set session streaming state:', e);
+                  }
+                  continue;
+                }
 
                 try {
                   const parsed = JSON.parse(data);
@@ -485,7 +532,16 @@ export function ChatPageContent({ initialSessionId }: ChatPageContentProps) {
             for (const line of lines) {
               if (line.startsWith("data: ")) {
                 const data = line.slice(6);
-                if (data === "[DONE]") continue;
+                if (data === "[DONE]") {
+                  // Stream complete - update global store immediately
+                  // This ensures spinners stop even if user navigated away
+                  try {
+                    setSessionStreaming(currentSessionId, false);
+                  } catch (e) {
+                    console.warn('Failed to set session streaming state:', e);
+                  }
+                  continue;
+                }
 
                 try {
                   const parsed = JSON.parse(data);
@@ -594,13 +650,29 @@ export function ChatPageContent({ initialSessionId }: ChatPageContentProps) {
         // Save error message to database
         await saveMessage(currentSessionId, "assistant", errorContent);
       }
+      // On error/abort, ensure streaming state is cleared in global store
+      try {
+        setSessionStreaming(currentSessionId, false);
+      } catch (e) {
+        console.warn('Failed to clear session streaming state:', e);
+      }
     } finally {
       setIsLoading(false);
       setImageMode(false);
-      // Unregister session from global store
-      unregisterActiveSession(currentSessionId);
+      // Unregister session from global store (non-critical)
+      // This removes the session entirely after streaming is complete
+      try {
+        unregisterActiveSession(currentSessionId);
+      } catch (e) {
+        console.warn('Failed to unregister active session:', e);
+      }
+      // Navigate to session URL after streaming completes (if this was a new session)
+      // This prevents remounting during streaming which would break the UI updates
+      if (shouldNavigateAfterStreaming) {
+        router.replace(`/chat/${currentSessionId}`);
+      }
     }
-  }, [sessionId, mode, webEnabled, attachments, effectiveMode, router, registerActiveSession, unregisterActiveSession]);
+  }, [sessionId, mode, webEnabled, attachments, effectiveMode, router]);
 
   const handleFileSelect = useCallback(async (files: FileList) => {
     // Process each file asynchronously
