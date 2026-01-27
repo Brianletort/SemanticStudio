@@ -37,7 +37,8 @@ export interface OrchestratorInput {
   userId: string;
   requestedMode: ChatMode;
   webEnabled: boolean;
-  enableTrace: boolean;
+  /** @deprecated Trace is now always enabled */
+  enableTrace?: boolean;
   attachments?: Array<{
     id: string;
     name: string;
@@ -113,8 +114,8 @@ export class OrchestratorAgent {
     const runId = uuidv4();
     const turnId = uuidv4();
     
-    // Create event bus if tracing enabled
-    this.eventBus = input.enableTrace ? createEventBus() : null;
+    // Always create event bus for trace visibility
+    this.eventBus = createEventBus();
     
     // Determine mode
     let mode: Exclude<ChatMode, 'auto'>;

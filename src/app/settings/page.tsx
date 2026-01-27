@@ -44,6 +44,10 @@ import {
   Monitor,
   FolderKanban,
   Pin,
+  Network,
+  Search,
+  Clock,
+  TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -78,6 +82,41 @@ interface Memory {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+interface TopEntity {
+  entityId: string;
+  entityName: string;
+  entityType: string;
+  mentionCount: number;
+  lastMentioned: string;
+}
+
+interface ContextReference {
+  id: string;
+  refType: string;
+  context?: string;
+  importance: number;
+  createdAt: string;
+  entityName?: string;
+  entityType?: string;
+  sessionTitle?: string;
+}
+
+interface CrossGraphResult {
+  entity: {
+    id: string;
+    name: string;
+    type: string;
+    properties: Record<string, unknown>;
+  };
+  references: Array<{
+    sessionTitle: string;
+    context: string;
+    refType: string;
+    when: string;
+  }>;
+  totalMentions: number;
 }
 
 const conversationStyles = [
@@ -142,6 +181,14 @@ export default function SettingsPage() {
   const [editingMemory, setEditingMemory] = useState<Memory | null>(null);
   const [memoryContent, setMemoryContent] = useState("");
 
+  // Context Graph state
+  const [topEntities, setTopEntities] = useState<TopEntity[]>([]);
+  const [recentRefs, setRecentRefs] = useState<ContextReference[]>([]);
+  const [contextQuery, setContextQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<CrossGraphResult[]>([]);
+  const [contextLoading, setContextLoading] = useState(false);
+  const [contextSearching, setContextSearching] = useState(false);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -187,6 +234,68 @@ export default function SettingsPage() {
       toast.error("Failed to load settings");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchContextGraph = async () => {
+    setContextLoading(true);
+    try {
+      const [topRes, recentRes] = await Promise.all([
+        fetch("/api/memories/context-graph?action=top-entities&limit=10"),
+        fetch("/api/memories/context-graph?action=recent&limit=15"),
+      ]);
+
+      if (topRes.ok) {
+        const data = await topRes.json();
+        setTopEntities(data.data || []);
+      }
+
+      if (recentRes.ok) {
+        const data = await recentRes.json();
+        setRecentRefs(data.data || []);
+      }
+    } catch (error) {
+      console.error("Failed to fetch context graph:", error);
+    } finally {
+      setContextLoading(false);
+    }
+  };
+
+  const handleContextSearch = async () => {
+    if (!contextQuery.trim()) return;
+    
+    setContextSearching(true);
+    try {
+      const res = await fetch(`/api/memories/context-graph?query=${encodeURIComponent(contextQuery)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSearchResults(data.data || []);
+      }
+    } catch (error) {
+      console.error("Failed to search context:", error);
+      toast.error("Failed to search");
+    } finally {
+      setContextSearching(false);
+    }
+  };
+
+  const handleClearContextGraph = async () => {
+    if (!confirm("Are you sure you want to clear all your entity references? This cannot be undone.")) {
+      return;
+    }
+    
+    try {
+      const res = await fetch("/api/memories/context-graph", { method: "DELETE" });
+      if (res.ok) {
+        const data = await res.json();
+        setTopEntities([]);
+        setRecentRefs([]);
+        setSearchResults([]);
+        toast.success(`Cleared ${data.deletedCount} context references`);
+      }
+    } catch (error) {
+      console.error("Failed to clear context:", error);
+      toast.error("Failed to clear context");
     }
   };
 
@@ -351,7 +460,7 @@ export default function SettingsPage() {
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-4xl mx-auto">
           <Tabs defaultValue="profile" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-6">
+            <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="profile" className="flex items-center gap-2">
                 <User className="h-4 w-4" />
                 Profile
@@ -374,7 +483,15 @@ export default function SettingsPage() {
               </TabsTrigger>
               <TabsTrigger value="memories" className="flex items-center gap-2">
                 <Edit className="h-4 w-4" />
-                Saved Memories
+                Saved
+              </TabsTrigger>
+              <TabsTrigger 
+                value="context" 
+                className="flex items-center gap-2"
+                onClick={() => fetchContextGraph()}
+              >
+                <Network className="h-4 w-4" />
+                Context
               </TabsTrigger>
             </TabsList>
 
@@ -831,6 +948,199 @@ export default function SettingsPage() {
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* Context Graph Tab */}
+            <TabsContent value="context">
+              <div className="space-y-6">
+                {/* Search Section */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Search className="h-5 w-5" />
+                      What did I discuss about...?
+                    </CardTitle>
+                    <CardDescription>
+                      Search your conversation history by topic, entity, or keyword
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="e.g., Acme Corp, sales, product roadmap..."
+                        value={contextQuery}
+                        onChange={(e) => setContextQuery(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleContextSearch()}
+                      />
+                      <Button onClick={handleContextSearch} disabled={contextSearching || !contextQuery.trim()}>
+                        {contextSearching ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Search className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+
+                    {/* Search Results */}
+                    {searchResults.length > 0 && (
+                      <div className="mt-4 space-y-4">
+                        <h4 className="text-sm font-medium text-muted-foreground">
+                          Found {searchResults.length} matching {searchResults.length === 1 ? "entity" : "entities"}
+                        </h4>
+                        {searchResults.map((result) => (
+                          <div key={result.entity.id} className="border rounded-lg p-4">
+                            <div className="flex items-center gap-2 mb-3">
+                              <Badge variant="secondary">{result.entity.type}</Badge>
+                              <span className="font-medium">{result.entity.name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                ({result.totalMentions} {result.totalMentions === 1 ? "mention" : "mentions"})
+                              </span>
+                            </div>
+                            <div className="space-y-2">
+                              {result.references.slice(0, 5).map((ref, idx) => (
+                                <div key={idx} className="text-sm pl-4 border-l-2 border-muted">
+                                  <div className="flex items-center gap-2 text-muted-foreground">
+                                    <Badge variant="outline" className="text-xs">{ref.refType}</Badge>
+                                    <span className="text-xs">{ref.sessionTitle}</span>
+                                    <span className="text-xs">•</span>
+                                    <span className="text-xs">{new Date(ref.when).toLocaleDateString()}</span>
+                                  </div>
+                                  {ref.context && (
+                                    <p className="mt-1 text-muted-foreground line-clamp-2">{ref.context}</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Top Entities */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5" />
+                      Most Discussed Entities
+                    </CardTitle>
+                    <CardDescription>
+                      Topics and entities you&apos;ve discussed most frequently
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {contextLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : topEntities.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Network className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No entity references yet</p>
+                        <p className="text-sm">
+                          As you chat, AgentKit will track entities you discuss
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {topEntities.map((entity) => (
+                          <div
+                            key={entity.entityId}
+                            className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer"
+                            onClick={() => {
+                              setContextQuery(entity.entityName);
+                              handleContextSearch();
+                            }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                <span className="text-sm font-medium text-primary">
+                                  {entity.mentionCount}
+                                </span>
+                              </div>
+                              <div>
+                                <p className="font-medium text-sm">{entity.entityName}</p>
+                                <p className="text-xs text-muted-foreground">{entity.entityType}</p>
+                              </div>
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              Last: {new Date(entity.lastMentioned).toLocaleDateString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Recent References */}
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <Clock className="h-5 w-5" />
+                          Recent Context
+                        </CardTitle>
+                        <CardDescription>
+                          Your most recent entity references across conversations
+                        </CardDescription>
+                      </div>
+                      {recentRefs.length > 0 && (
+                        <Button variant="outline" size="sm" onClick={handleClearContextGraph}>
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Clear All
+                        </Button>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {contextLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : recentRefs.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No recent context</p>
+                        <p className="text-sm">
+                          Entity references will appear here as you chat
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {recentRefs.map((ref) => (
+                          <div
+                            key={ref.id}
+                            className="flex items-start gap-3 p-3 rounded-lg border"
+                          >
+                            <Badge variant="outline" className="shrink-0">{ref.refType}</Badge>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                {ref.entityName && (
+                                  <span className="font-medium text-sm">{ref.entityName}</span>
+                                )}
+                                {ref.entityType && (
+                                  <Badge variant="secondary" className="text-xs">{ref.entityType}</Badge>
+                                )}
+                              </div>
+                              {ref.context && (
+                                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                  {ref.context}
+                                </p>
+                              )}
+                            </div>
+                            <span className="text-xs text-muted-foreground shrink-0">
+                              {new Date(ref.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
           </Tabs>
         </div>

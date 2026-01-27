@@ -1,15 +1,16 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Bot, User, Loader2, Download, ImageIcon, Maximize2, FileText, FileSpreadsheet, Presentation, FileJson, File } from "lucide-react";
+import { Bot, User, Loader2, Download, ImageIcon, Maximize2, FileText, FileSpreadsheet, Presentation, FileJson, File, Activity } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { FileAttachment } from "./chat-input";
 import { ImageProgress } from "./image-progress";
 import { CodeBlock } from "./code-block";
 import { EvaluationDisplay } from "./evaluation-display";
+import { TraceModal } from "./trace-modal";
 
 interface PartialImage {
   index: number;
@@ -78,6 +79,7 @@ function getFileIcon(type: string, name: string) {
 
 export function ChatMessages({ messages, isLoading = false }: ChatMessagesProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [selectedTurnId, setSelectedTurnId] = useState<string | null>(null);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -262,13 +264,24 @@ export function ChatMessages({ messages, isLoading = false }: ChatMessagesProps)
                 )}
               </div>
 
-              {/* Evaluation display for assistant messages */}
+              {/* Evaluation display and trace button for assistant messages */}
               {message.role === "assistant" && message.turnId && !message.isStreaming && (
-                <EvaluationDisplay
-                  turnId={message.turnId}
-                  messageContent={message.content}
-                  mode={message.effectiveMode}
-                />
+                <div className="flex items-center gap-2 flex-wrap">
+                  <EvaluationDisplay
+                    turnId={message.turnId}
+                    messageContent={message.content}
+                    mode={message.effectiveMode}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedTurnId(message.turnId!)}
+                    className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    <Activity className="h-3 w-3 mr-1" />
+                    Show Trace
+                  </Button>
+                </div>
               )}
 
               {/* Timestamp */}
@@ -296,6 +309,13 @@ export function ChatMessages({ messages, isLoading = false }: ChatMessagesProps)
           </div>
         )}
       </div>
+
+      {/* Trace Modal */}
+      <TraceModal
+        turnId={selectedTurnId}
+        open={!!selectedTurnId}
+        onClose={() => setSelectedTurnId(null)}
+      />
     </div>
   );
 }

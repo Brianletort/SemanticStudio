@@ -130,7 +130,7 @@ const DEFAULT_CONFIGS: Record<ModelRole, Omit<ModelConfigRecord, 'role'>> = {
   },
   memory_extractor: {
     provider: 'openai',
-    modelName: 'gpt-5-mini',
+    modelName: 'gpt-4o-mini',  // Use gpt-4o-mini for reliable JSON extraction
     config: { temperature: 0.3, maxTokens: 1024 },
   },
   embeddings: {

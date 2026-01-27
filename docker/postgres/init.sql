@@ -44,7 +44,11 @@ CREATE TABLE IF NOT EXISTS messages (
   role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
   content TEXT NOT NULL,
   metadata JSONB DEFAULT '{}',
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  -- Progressive summarization fields
+  compression_level TEXT DEFAULT 'full' CHECK (compression_level IN ('full', 'compressed', 'archived')),
+  compressed_content TEXT,
+  token_count INTEGER
 );
 
 -- Session Memory Facts
@@ -223,7 +227,7 @@ INSERT INTO model_configs (role, provider, model_name, config) VALUES
   ('mode_classifier', 'openai', 'gpt-5-mini', '{"temperature": 0.1, "max_tokens": 256}'),
   ('memory_extractor', 'openai', 'gpt-5-mini', '{"temperature": 0.3, "max_tokens": 1024}'),
   ('embeddings', 'openai', 'text-embedding-3-large', '{"dimensions": 1536}'),
-  ('image_generation', 'openai', 'gpt-image-1.5', '{"size": "1024x1024", "quality": "standard"}'),
+  ('image_generation', 'openai', 'gpt-image-1.5', '{"size": "1024x1024", "quality": "medium"}'),
   ('research', 'openai', 'o3-deep-research', '{"temperature": 0.7, "max_tokens": 16384}')
 ON CONFLICT (role) DO NOTHING;
 
@@ -309,6 +313,34 @@ CREATE TABLE IF NOT EXISTS knowledge_graph_edges (
   confidence FLOAT DEFAULT 1.0,
   properties JSONB DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================
+-- CONTEXT REFERENCES (Bridge Layer)
+-- ============================================
+-- Links user context (sessions, facts) to domain knowledge graph
+-- Enables cross-graph queries like "What did I discuss about Customer X?"
+-- User-isolated: each user's context references are private
+
+CREATE TABLE IF NOT EXISTS context_references (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  -- User isolation - required for privacy
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  -- Link to session where reference occurred
+  session_id UUID REFERENCES sessions(id) ON DELETE CASCADE,
+  -- Link to knowledge graph entity
+  kg_node_id UUID REFERENCES knowledge_graph_nodes(id) ON DELETE CASCADE,
+  -- Optional link to specific memory fact
+  memory_fact_id UUID REFERENCES session_memory_facts(id) ON DELETE SET NULL,
+  -- Type of reference: 'discussed', 'queried', 'mentioned', 'interested_in', 'analyzed'
+  ref_type TEXT NOT NULL,
+  -- Snippet of context (what was said about the entity)
+  context TEXT,
+  -- Importance score (0-1)
+  importance FLOAT DEFAULT 0.5,
+  -- Timestamps
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================
@@ -491,6 +523,12 @@ CREATE INDEX IF NOT EXISTS idx_kg_nodes_source ON knowledge_graph_nodes(source_t
 CREATE INDEX IF NOT EXISTS idx_kg_edges_source ON knowledge_graph_edges(source_id);
 CREATE INDEX IF NOT EXISTS idx_kg_edges_target ON knowledge_graph_edges(target_id);
 CREATE INDEX IF NOT EXISTS idx_kg_edges_type ON knowledge_graph_edges(relationship_type);
+
+-- Context References indexes (Bridge Layer)
+CREATE INDEX IF NOT EXISTS idx_context_refs_user_id ON context_references(user_id);
+CREATE INDEX IF NOT EXISTS idx_context_refs_session_id ON context_references(session_id);
+CREATE INDEX IF NOT EXISTS idx_context_refs_kg_node_id ON context_references(kg_node_id);
+CREATE INDEX IF NOT EXISTS idx_context_refs_user_kg ON context_references(user_id, kg_node_id);
 
 -- Semantic layer indexes
 CREATE INDEX IF NOT EXISTS idx_semantic_entities_name ON semantic_entities(name);

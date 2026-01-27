@@ -142,7 +142,7 @@ function buildFileContext(attachments: FileAttachmentData[]): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { message, sessionId, mode: requestedMode = "think", imageMode = false, webEnabled = false, attachments = [], enableTrace = false } = body;
+    const { message, sessionId, mode: requestedMode = "think", imageMode = false, webEnabled = false, attachments = [] } = body;
 
     if (!message) {
       return new Response(JSON.stringify({ error: "Message is required" }), {
@@ -212,24 +212,21 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Always create event bus for DB persistence (events are logged regardless of UI state)
-    // The enableTrace flag controls whether events are streamed to the frontend
+    // Always create event bus for DB persistence and UI streaming
     const eventBus = createEventBus();
     
-    // Collect events to stream to frontend (only if trace UI is enabled)
+    // Collect events to stream to frontend (always collected for trace visibility)
     const collectedEvents: AgentEvent[] = [];
     
     // Set up listener to collect events for streaming to UI
-    if (enableTrace) {
-      eventBus.on('*', (event: AgentEvent) => {
-        collectedEvents.push(event);
-      });
-    }
+    eventBus.on('*', (event: AgentEvent) => {
+      collectedEvents.push(event);
+    });
 
     // Helper to emit events (always emits for DB persistence)
-    // Includes sessionId for historical trace retrieval
-    const emitEvent = async (event: Omit<AgentEvent, 'runId' | 'sessionId'>) => {
-      await eventBus.emit({ ...event, runId, sessionId: sessionId || undefined } as AgentEvent);
+    // Includes sessionId and turnId for historical trace retrieval
+    const emitEvent = async (event: Omit<AgentEvent, 'runId' | 'sessionId' | 'turnId'>) => {
+      await eventBus.emit({ ...event, runId, turnId, sessionId: sessionId || undefined } as AgentEvent);
     };
 
     // Handle auto mode classification
@@ -471,7 +468,7 @@ export async function POST(request: NextRequest) {
             }
 
             // Send collected events
-            if (enableTrace && collectedEvents.length > 0) {
+            if (collectedEvents.length > 0) {
               for (const event of collectedEvents) {
                 const eventData = JSON.stringify({ type: 'agent', event });
                 controller.enqueue(encoder.encode(`data: ${eventData}\n\n`));
@@ -541,7 +538,7 @@ Include citations and sources for all findings.`,
               }
 
               // Send collected events
-              if (enableTrace && collectedEvents.length > 0) {
+              if (collectedEvents.length > 0) {
                 for (const event of collectedEvents) {
                   const eventData = JSON.stringify({ type: 'agent', event });
                   controller.enqueue(encoder.encode(`data: ${eventData}\n\n`));
@@ -581,10 +578,9 @@ Include citations and sources for all findings.`,
                 };
                 await eventBus.emit(progressEvent);
                 
-                if (enableTrace) {
-                  const eventData = JSON.stringify({ type: 'agent', event: progressEvent });
-                  controller.enqueue(encoder.encode(`data: ${eventData}\n\n`));
-                }
+                // Stream progress event to frontend
+                const progressEventData = JSON.stringify({ type: 'agent', event: progressEvent });
+                controller.enqueue(encoder.encode(`data: ${progressEventData}\n\n`));
 
                 // Stream progress updates to user
                 if (status.sourcesFound && status.sourcesFound > lastSourcesFound) {
@@ -617,10 +613,9 @@ Include citations and sources for all findings.`,
                   };
                   await eventBus.emit(completeEvent);
                   
-                  if (enableTrace) {
-                    const eventData = JSON.stringify({ type: 'agent', event: completeEvent });
-                    controller.enqueue(encoder.encode(`data: ${eventData}\n\n`));
-                  }
+                  // Stream complete event to frontend
+                  const completeEventData = JSON.stringify({ type: 'agent', event: completeEvent });
+                  controller.enqueue(encoder.encode(`data: ${completeEventData}\n\n`));
 
                   // Stream the final report
                   const divider = JSON.stringify({ type: 'content', content: '\n\n---\n\n# Research Report\n\n' });
@@ -767,7 +762,7 @@ If the retrieved data doesn't contain the answer, you can still provide helpful 
           }
 
           // Send all collected agent events (from before streaming started)
-          if (enableTrace && collectedEvents.length > 0) {
+          if (collectedEvents.length > 0) {
             for (const event of collectedEvents) {
               const eventData = JSON.stringify({ type: 'agent', event });
               controller.enqueue(encoder.encode(`data: ${eventData}\n\n`));
@@ -792,10 +787,8 @@ If the retrieved data doesn't contain the answer, you can still provide helpful 
           await eventBus.emit(finishedEvent);
           
           // Stream the finished event to frontend
-          if (enableTrace) {
-            const eventData = JSON.stringify({ type: 'agent', event: finishedEvent });
-            controller.enqueue(encoder.encode(`data: ${eventData}\n\n`));
-          }
+          const finishedEventData = JSON.stringify({ type: 'agent', event: finishedEvent });
+          controller.enqueue(encoder.encode(`data: ${finishedEventData}\n\n`));
 
           // Run memory update and evaluation in parallel, waiting for results
           // so we can emit events BEFORE closing the stream
@@ -823,10 +816,8 @@ If the retrieved data doesn't contain the answer, you can still provide helpful 
                 await eventBus.emit(memorySavedEvent);
                 
                 // Stream the memory event to frontend
-                if (enableTrace) {
-                  const eventData = JSON.stringify({ type: 'agent', event: memorySavedEvent });
-                  controller.enqueue(encoder.encode(`data: ${eventData}\n\n`));
-                }
+                const memorySavedEventData = JSON.stringify({ type: 'agent', event: memorySavedEvent });
+                controller.enqueue(encoder.encode(`data: ${memorySavedEventData}\n\n`));
               }
             }).catch(err => {
               console.error('[Memory] Failed to update after turn:', err);
@@ -859,10 +850,8 @@ If the retrieved data doesn't contain the answer, you can still provide helpful 
                 await eventBus.emit(judgeEvent);
                 
                 // Stream the evaluation event to frontend
-                if (enableTrace) {
-                  const eventData = JSON.stringify({ type: 'agent', event: judgeEvent });
-                  controller.enqueue(encoder.encode(`data: ${eventData}\n\n`));
-                }
+                const judgeEventData = JSON.stringify({ type: 'agent', event: judgeEvent });
+                controller.enqueue(encoder.encode(`data: ${judgeEventData}\n\n`));
               }
             }).catch(err => {
               console.error('[Evaluation] Failed:', err);

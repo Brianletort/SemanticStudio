@@ -53,8 +53,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Validate quality parameter - fallback to 'medium' if invalid
+    const validQualities = ['low', 'medium', 'high', 'auto'];
+    const validatedQuality = validQualities.includes(quality) ? quality : 'medium';
+
     const options: ImageGenerationOptions = {
-      quality,
+      quality: validatedQuality,
       size,
       background,
       model,

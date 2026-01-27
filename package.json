@@ -10,7 +10,19 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:memory": "npx playwright test --config=tests/memory/playwright.config.ts",
+    "test:memory:core": "npx playwright test --config=tests/memory/playwright.config.ts --project=core-chat",
+    "test:memory:tiers": "npx playwright test --config=tests/memory/playwright.config.ts --project=memory-tiers",
+    "test:memory:stress": "npx playwright test --config=tests/memory/playwright.config.ts --project=stress",
+    "test:memory:edge": "npx playwright test --config=tests/memory/playwright.config.ts --project=edge-cases",
+    "test:memory:all": "npx playwright test --config=tests/memory/playwright.config.ts --project=all",
+    "test:memory:report": "npx tsx tests/memory/run-memory-tests.ts",
+    "test:memory:api": "vitest run tests/memory/api/",
+    "test:memory:security": "vitest run tests/memory/security/",
+    "test:memory:concurrency": "vitest run tests/memory/concurrency/",
+    "test:memory:resilience": "vitest run tests/memory/resilience/",
+    "test:memory:validate": "vitest run tests/memory/api/ tests/memory/security/ tests/memory/concurrency/ tests/memory/resilience/"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
@@ -39,6 +51,7 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "drizzle-orm": "^0.45.1",
+    "gpt-tokenizer": "^3.4.0",
     "lucide-react": "^0.563.0",
     "mammoth": "^1.11.0",
     "next": "16.1.4",
@@ -64,6 +77,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

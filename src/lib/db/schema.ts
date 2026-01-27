@@ -50,6 +50,10 @@ export const messages = pgTable('messages', {
   content: text('content').notNull(),
   metadata: jsonb('metadata').default({}),
   createdAt: timestamp('created_at').defaultNow(),
+  // Progressive summarization fields
+  compressionLevel: text('compression_level').default('full'), // 'full', 'compressed', 'archived'
+  compressedContent: text('compressed_content'), // Summarized version when compressed
+  tokenCount: integer('token_count'), // Cached token count for budget management
 }, (table) => ({
   sessionIdIdx: index('idx_messages_session_id').on(table.sessionId),
   createdAtIdx: index('idx_messages_created_at').on(table.createdAt),
@@ -371,6 +375,39 @@ export const knowledgeGraphEdges = pgTable('knowledge_graph_edges', {
   sourceIdx: index('idx_kg_edges_source').on(table.sourceId),
   targetIdx: index('idx_kg_edges_target').on(table.targetId),
   typeIdx: index('idx_kg_edges_type').on(table.relationshipType),
+}));
+
+// ============================================
+// CONTEXT REFERENCES (Bridge Layer)
+// ============================================
+// Links user context (sessions, facts) to domain knowledge graph
+// Enables cross-graph queries like "What did I discuss about Customer X?"
+// User-isolated: each user's context references are private
+
+export const contextReferences = pgTable('context_references', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  // User isolation - required for privacy
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  // Link to session where reference occurred
+  sessionId: uuid('session_id').references(() => sessions.id, { onDelete: 'cascade' }),
+  // Link to knowledge graph entity
+  kgNodeId: uuid('kg_node_id').references(() => knowledgeGraphNodes.id, { onDelete: 'cascade' }),
+  // Optional link to specific memory fact
+  memoryFactId: uuid('memory_fact_id').references(() => sessionMemoryFacts.id, { onDelete: 'set null' }),
+  // Type of reference: 'discussed', 'queried', 'mentioned', 'interested_in', 'analyzed'
+  refType: text('ref_type').notNull(),
+  // Snippet of context (what was said about the entity)
+  context: text('context'),
+  // Importance score (0-1)
+  importance: real('importance').default(0.5),
+  // Timestamps
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  userIdIdx: index('idx_context_refs_user_id').on(table.userId),
+  sessionIdIdx: index('idx_context_refs_session_id').on(table.sessionId),
+  kgNodeIdIdx: index('idx_context_refs_kg_node_id').on(table.kgNodeId),
+  userKgNodeIdx: index('idx_context_refs_user_kg').on(table.userId, table.kgNodeId),
 }));
 
 // ============================================
@@ -720,6 +757,7 @@ export const chatAgentEvents = pgTable('chat_agent_events', {
   id: uuid('id').primaryKey().defaultRandom(),
   runId: uuid('run_id').notNull(),
   sessionId: uuid('session_id').references(() => sessions.id, { onDelete: 'cascade' }),
+  turnId: uuid('turn_id'),  // Links events to specific response for historical trace retrieval
   idx: integer('idx').notNull(),
   eventType: text('event_type').notNull(),
   agentId: text('agent_id'),
@@ -731,6 +769,7 @@ export const chatAgentEvents = pgTable('chat_agent_events', {
 }, (table) => ({
   runIdIdx: index('idx_chat_agent_events_run_id').on(table.runId),
   sessionIdIdx: index('idx_chat_agent_events_session_id').on(table.sessionId),
+  turnIdIdx: index('idx_chat_agent_events_turn_id').on(table.turnId),
   createdAtIdx: index('idx_chat_agent_events_created_at').on(table.createdAt),
 }));
 
@@ -776,6 +815,7 @@ export type GeneratedImage = typeof generatedImages.$inferSelect;
 export type OpenaiFile = typeof openaiFiles.$inferSelect;
 export type KnowledgeGraphNode = typeof knowledgeGraphNodes.$inferSelect;
 export type KnowledgeGraphEdge = typeof knowledgeGraphEdges.$inferSelect;
+export type ContextReference = typeof contextReferences.$inferSelect;
 export type SemanticEntity = typeof semanticEntities.$inferSelect;
 export type EntityAlias = typeof entityAliases.$inferSelect;
 export type EtlJobRun = typeof etlJobRuns.$inferSelect;

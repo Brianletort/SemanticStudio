@@ -365,7 +365,7 @@ function getDefaultConfigs(): ModelConfig[] {
     { role: "mode_classifier", provider: "openai", modelName: "gpt-5-mini", config: { temperature: 0.1, maxTokens: 256 } },
     { role: "memory_extractor", provider: "openai", modelName: "gpt-5-mini", config: { temperature: 0.3, maxTokens: 1024 } },
     { role: "embeddings", provider: "openai", modelName: "text-embedding-3-large", config: { dimensions: 1536 } },
-    { role: "image_generation", provider: "openai", modelName: "gpt-image-1.5", config: { size: "1024x1024", quality: "standard" } },
+    { role: "image_generation", provider: "openai", modelName: "gpt-image-1.5", config: { size: "1024x1024", quality: "medium" } },
     { role: "research", provider: "openai", modelName: "o3-deep-research", config: { temperature: 0.7, maxTokens: 16384 } },
   ];
 }

@@ -114,6 +114,14 @@ export class OpenAIProvider implements LLMProvider {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const response = await (this.client as any).responses.create(requestParams);
 
+    console.log(`[OpenAI] output_text: "${response.output_text?.substring(0, 100)}"`);
+    console.log(`[OpenAI] output items: ${response.output?.length}`);
+    if (response.output) {
+      for (const item of response.output) {
+        console.log(`[OpenAI] Output item type=${item.type}, content=${JSON.stringify(item.content || item.text || item.summary || 'none').substring(0, 200)}`);
+      }
+    }
+
     // Extract tool calls from output if present
     const toolCalls = response.output
       ?.filter((item: { type: string }) => item.type === 'function_call' || item.type === 'tool_use')
@@ -358,8 +366,15 @@ export class OpenAIProvider implements LLMProvider {
       const arrayBuffer = await response.arrayBuffer();
       const blob = new Blob([arrayBuffer], { type: 'image/png' });
       imageFile = new File([blob], 'input.png', { type: 'image/png' });
+    } else if (inputImage.type === 'file_id') {
+      // Fetch file content from OpenAI Files API
+      console.log(`[OpenAI] Fetching file content for file_id: ${inputImage.value}`);
+      const fileResponse = await this.client.files.content(inputImage.value);
+      const arrayBuffer = await fileResponse.arrayBuffer();
+      const blob = new Blob([arrayBuffer], { type: inputImage.mimeType || 'image/png' });
+      imageFile = new File([blob], 'input.png', { type: 'image/png' });
     } else {
-      throw new Error('File ID input not supported for image editing');
+      throw new Error(`Unsupported input image type: ${inputImage.type}`);
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

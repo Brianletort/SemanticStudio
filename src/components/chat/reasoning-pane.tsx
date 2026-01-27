@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Brain, 
-  X, 
   Minimize2,
   Maximize2,
   Globe,
@@ -111,7 +110,6 @@ function getEventCategory(event: AgentEvent): EventCategory {
 
 interface ReasoningPaneProps {
   isVisible: boolean;
-  onClose: () => void;
   isProcessing: boolean;
   isMinimized?: boolean;
   onToggleMinimized?: () => void;
@@ -121,7 +119,6 @@ interface ReasoningPaneProps {
 
 export function ReasoningPane({ 
   isVisible, 
-  onClose, 
   isProcessing,
   isMinimized = false,
   onToggleMinimized,
@@ -485,15 +482,6 @@ export function ReasoningPane({
                 {isMinimized ? <Maximize2 className="w-3 h-3" /> : <Minimize2 className="w-3 h-3" />}
               </Button>
             )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="h-7 w-7 p-0"
-              title="Close"
-            >
-              <X className="w-3 h-3" />
-            </Button>
           </div>
         </div>
       </div>

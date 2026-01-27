@@ -17,6 +17,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Zap, Brain, Sparkles, Search, Plus, Globe, Wand2, Activity } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
+import { toast } from "sonner";
 import type { AgentEvent, ModeClassification } from "@/lib/chat/types";
 
 type ChatMode = "auto" | "quick" | "think" | "deep" | "research";
@@ -42,8 +43,7 @@ export default function ChatPage() {
   const [sessionPaneOpen, setSessionPaneOpen] = useState(true);
   const abortControllerRef = useRef<AbortController | null>(null);
   
-  // Trace/debug panel state - enabled by default so users see agent steps
-  const [tracePaneOpen, setTracePaneOpen] = useState(true);
+  // Trace/debug panel state - always visible, can be minimized
   const [traceMinimized, setTraceMinimized] = useState(false);
   const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
   const [modeClassification, setModeClassification] = useState<ModeClassification | null>(null);
@@ -87,7 +87,7 @@ export default function ChatPage() {
   };
 
   // Load messages for a session
-  const loadSessionMessages = async (sessionIdToLoad: string) => {
+  const loadSessionMessages = useCallback(async (sessionIdToLoad: string) => {
     try {
       const response = await fetch(`/api/sessions/${sessionIdToLoad}/messages`);
       if (response.ok) {
@@ -115,26 +115,39 @@ export default function ChatPage() {
           content: m.content,
           timestamp: new Date(m.createdAt),
           attachments: m.metadata?.attachments as FileAttachment[] | undefined,
+          // Restore evaluation and trace data if present
+          turnId: m.metadata?.turnId as string | undefined,
+          effectiveMode: m.metadata?.effectiveMode as string | undefined,
           // Restore image generation data if present
           imageGeneration: m.imageGeneration,
         }));
         setMessages(loadedMessages);
+      } else {
+        console.error("Failed to load messages: HTTP", response.status);
+        toast.error("Failed to load conversation");
       }
     } catch (error) {
       console.error("Failed to load messages:", error);
+      toast.error("Failed to load conversation");
     }
-  };
+  }, []);
 
   // Save a message to the session
-  const saveMessage = async (sessionIdToSave: string, role: string, content: string, metadata?: Record<string, unknown>) => {
+  const saveMessage = async (sessionIdToSave: string, role: string, content: string, metadata?: Record<string, unknown>): Promise<string | null> => {
     try {
-      await fetch(`/api/sessions/${sessionIdToSave}/messages`, {
+      const response = await fetch(`/api/sessions/${sessionIdToSave}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role, content, metadata }),
       });
+      if (response.ok) {
+        const data = await response.json();
+        return data.id || null;
+      }
+      return null;
     } catch (error) {
       console.error("Failed to save message:", error);
+      return null;
     }
   };
 
@@ -167,7 +180,7 @@ export default function ChatPage() {
     setAttachments([]);
     setImageMode(false);
     await loadSessionMessages(session.id);
-  }, [sessionId]);
+  }, [sessionId, loadSessionMessages]);
 
   // Handle new chat - just clear state, session created on first message
   const handleNewChat = useCallback(() => {
@@ -255,12 +268,20 @@ export default function ChatPage() {
 
       // Handle image generation mode
       if (imageSettings) {
+        // Save assistant message FIRST to get the database-generated message ID
+        // This ensures proper linkage between the message and the generated image
+        const savedMessageId = await saveMessage(currentSessionId, "assistant", "", {
+          imageGeneration: true,
+          prompt: message,
+        });
+
         const imageResponse = await fetch("/api/images/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             prompt: message,
             sessionId: currentSessionId,
+            messageId: savedMessageId, // Pass the message ID for proper linkage
             quality: imageSettings.quality,
             size: imageSettings.size,
             background: imageSettings.transparentBackground ? 'transparent' : 'opaque',
@@ -367,12 +388,8 @@ export default function ChatPage() {
             }
           }
         }
-
-        // Save assistant message with image reference
-        await saveMessage(currentSessionId, "assistant", "", {
-          imageGeneration: true,
-          prompt: message,
-        });
+        // Note: Assistant message was already saved at the start of image generation
+        // to ensure proper messageId linkage with the generated image
       } else {
         // Clear previous trace data
         setAgentEvents([]);
@@ -389,7 +406,7 @@ export default function ChatPage() {
             mode,
             imageMode: false,
             webEnabled,
-            enableTrace: tracePaneOpen, // Enable trace events if pane is open
+            enableTrace: true, // Always enable trace events
             attachments: attachments
               .filter((a) => a.status === 'ready')
               .map((a) => ({
@@ -416,59 +433,87 @@ export default function ChatPage() {
         }
 
         let fullContent = "";
+        // Buffer for incomplete SSE messages (data can be chunked across reads)
+        let sseBuffer = '';
+        // Track turnId and effectiveMode for persistence
+        let messageTurnId: string | null = null;
+        let messageEffectiveMode: string | undefined = undefined;
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n");
+          // Append new chunk to buffer
+          sseBuffer += decoder.decode(value, { stream: true });
+          
+          // Process complete SSE messages (those ending with \n\n)
+          // SSE format: "data: {...}\n\n"
+          const sseMessages = sseBuffer.split('\n\n');
+          
+          // Keep the last part in buffer if it's incomplete (no trailing \n\n)
+          sseBuffer = sseMessages.pop() || '';
 
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              const data = line.slice(6);
-              if (data === "[DONE]") continue;
+          for (const sseMessage of sseMessages) {
+            const lines = sseMessage.split('\n');
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const data = line.slice(6);
+                if (data === "[DONE]") continue;
 
-              try {
-                const parsed = JSON.parse(data);
-                
-                // Handle different event types
-                if (parsed.type === 'content') {
-                  // Content chunk
-                  fullContent += parsed.content;
-                  setMessages((prev) =>
-                    prev.map((m) =>
-                      m.id === assistantMessageId
-                        ? { ...m, content: fullContent }
-                        : m
-                    )
-                  );
-                } else if (parsed.type === 'mode') {
-                  // Mode classification result
-                  setModeClassification(parsed.classification);
-                  setEffectiveMode(parsed.classification.recommendedMode);
-                  if (parsed.turnId) {
-                    setCurrentTurnId(parsed.turnId);
-                  }
-                } else if (parsed.type === 'agent') {
-                  // Agent event for trace
-                  setAgentEvents((prev) => [...prev, parsed.event]);
-                } else if (parsed.type === 'evaluation') {
-                  // Evaluation ready - store turnId for display
-                  if (parsed.turnId) {
-                    setCurrentTurnId(parsed.turnId);
-                    // Update the message with turnId for evaluation display
+                try {
+                  const parsed = JSON.parse(data);
+                  
+                  // Handle different event types
+                  if (parsed.type === 'content') {
+                    // Content chunk
+                    fullContent += parsed.content;
                     setMessages((prev) =>
                       prev.map((m) =>
                         m.id === assistantMessageId
-                          ? { ...m, turnId: parsed.turnId, effectiveMode: effectiveMode }
+                          ? { ...m, content: fullContent }
+                          : m
+                      )
+                    );
+                  } else if (parsed.type === 'mode') {
+                    // Mode classification result
+                    setModeClassification(parsed.classification);
+                    setEffectiveMode(parsed.classification.recommendedMode);
+                    if (parsed.turnId) {
+                      setCurrentTurnId(parsed.turnId);
+                    }
+                  } else if (parsed.type === 'agent') {
+                    // Agent event for trace
+                    setAgentEvents((prev) => [...prev, parsed.event]);
+                  } else if (parsed.type === 'evaluation') {
+                    // Evaluation ready - store turnId for display
+                    if (parsed.turnId) {
+                      setCurrentTurnId(parsed.turnId);
+                      // Capture for persistence
+                      messageTurnId = parsed.turnId;
+                      messageEffectiveMode = effectiveMode;
+                      // Update the message with turnId for evaluation display
+                      setMessages((prev) =>
+                        prev.map((m) =>
+                          m.id === assistantMessageId
+                            ? { ...m, turnId: parsed.turnId, effectiveMode: effectiveMode }
+                            : m
+                        )
+                      );
+                    }
+                  } else if (parsed.content) {
+                    // Legacy format - just content
+                    fullContent += parsed.content;
+                    setMessages((prev) =>
+                      prev.map((m) =>
+                        m.id === assistantMessageId
+                          ? { ...m, content: fullContent }
                           : m
                       )
                     );
                   }
-                } else if (parsed.content) {
-                  // Legacy format - just content
-                  fullContent += parsed.content;
+                } catch {
+                  // Not JSON, treat as plain text (legacy)
+                  fullContent += data;
                   setMessages((prev) =>
                     prev.map((m) =>
                       m.id === assistantMessageId
@@ -477,16 +522,6 @@ export default function ChatPage() {
                     )
                   );
                 }
-              } catch {
-                // Not JSON, treat as plain text (legacy)
-                fullContent += data;
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === assistantMessageId
-                      ? { ...m, content: fullContent }
-                      : m
-                  )
-                );
               }
             }
           }
@@ -499,8 +534,11 @@ export default function ChatPage() {
           )
         );
 
-        // Save assistant message to database
-        await saveMessage(currentSessionId, "assistant", fullContent);
+        // Save assistant message to database with evaluation metadata
+        await saveMessage(currentSessionId, "assistant", fullContent, {
+          turnId: messageTurnId,
+          effectiveMode: messageEffectiveMode,
+        });
       }
       
       // Refresh sessions to update timestamps
@@ -533,7 +571,7 @@ export default function ChatPage() {
       setIsLoading(false);
       setImageMode(false);
     }
-  }, [sessionId, mode, webEnabled, attachments, tracePaneOpen]);
+  }, [sessionId, mode, webEnabled, attachments, effectiveMode]);
 
   const handleFileSelect = useCallback(async (files: FileList) => {
     // Process each file asynchronously
@@ -640,12 +678,12 @@ export default function ChatPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Trace toggle */}
+            {/* Trace minimize toggle */}
             <Button 
-              variant={tracePaneOpen ? "default" : "outline"} 
+              variant={traceMinimized ? "outline" : "default"} 
               size="sm" 
-              onClick={() => setTracePaneOpen(!tracePaneOpen)}
-              title="Toggle agent trace"
+              onClick={() => setTraceMinimized(!traceMinimized)}
+              title={traceMinimized ? "Expand agent trace" : "Minimize agent trace"}
             >
               <Activity className="h-4 w-4" />
             </Button>
@@ -724,20 +762,17 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {/* Reasoning/Trace Pane */}
-      {tracePaneOpen && (
-        <div className={`${traceMinimized ? 'w-16' : 'w-80'} flex-shrink-0 transition-all duration-200`}>
-          <ReasoningPane
-            isVisible={true}
-            onClose={() => setTracePaneOpen(false)}
-            isProcessing={isLoading}
-            isMinimized={traceMinimized}
-            onToggleMinimized={() => setTraceMinimized(!traceMinimized)}
-            agentEvents={agentEvents}
-            modeClassification={modeClassification}
-          />
-        </div>
-      )}
+      {/* Reasoning/Trace Pane - Always visible */}
+      <div className={`${traceMinimized ? 'w-16' : 'w-80'} flex-shrink-0 transition-all duration-200`}>
+        <ReasoningPane
+          isVisible={true}
+          isProcessing={isLoading}
+          isMinimized={traceMinimized}
+          onToggleMinimized={() => setTraceMinimized(!traceMinimized)}
+          agentEvents={agentEvents}
+          modeClassification={modeClassification}
+        />
+      </div>
     </div>
   );
 }

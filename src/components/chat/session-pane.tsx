@@ -46,6 +46,7 @@ import {
   FolderOpen,
   FolderPlus,
   FolderInput,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -66,6 +67,14 @@ export interface SessionFolder {
   displayOrder: number;
   createdAt: string;
   updatedAt: string;
+}
+
+interface SearchResult {
+  id: string;
+  title: string;
+  snippet?: string;
+  matchType: "title" | "message";
+  updatedAt: string | null;
 }
 
 interface SessionPaneProps {
@@ -101,6 +110,53 @@ export function SessionPane({
   const [editFolderName, setEditFolderName] = useState("");
   const [deleteFolderDialogOpen, setDeleteFolderDialogOpen] = useState(false);
   const [folderToDelete, setFolderToDelete] = useState<SessionFolder | null>(null);
+
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Debounced search effect
+  useEffect(() => {
+    if (!searchQuery.trim() || searchQuery.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const response = await fetch(`/api/sessions/search?q=${encodeURIComponent(searchQuery)}`);
+        if (response.ok) {
+          const results = await response.json();
+          setSearchResults(results);
+        }
+      } catch (error) {
+        console.error("Search failed:", error);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
+
+  const handleSearchResultClick = (result: SearchResult) => {
+    console.log("[Search] Clicked on result:", result.id, result.title);
+    // Find the session in our sessions list or create a minimal session object
+    const existingSession = sessions.find(s => s.id === result.id);
+    console.log("[Search] Found existing session:", existingSession?.id);
+    const session = existingSession || {
+      id: result.id,
+      title: result.title,
+      createdAt: result.updatedAt || new Date().toISOString(),
+      updatedAt: result.updatedAt || new Date().toISOString(),
+    };
+    console.log("[Search] Calling onSessionSelect with:", session.id);
+    onSessionSelect(session);
+    setSearchQuery("");
+    setSearchResults([]);
+  };
 
   // Fetch folders on mount and when sessions change
   useEffect(() => {
@@ -583,8 +639,76 @@ export function SessionPane({
           </div>
         </div>
 
-        {/* Sessions list */}
-        <ScrollArea className="flex-1 overflow-hidden">
+        {/* Search Input */}
+        <div className="px-3 py-2 border-b">
+          <div className="relative">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              placeholder="Search conversations..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 h-9"
+            />
+            {searchQuery && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1 h-7 w-7"
+                onClick={() => {
+                  setSearchQuery("");
+                  setSearchResults([]);
+                }}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+        </div>
+        
+        {/* Search Results - shown instead of sessions list when searching */}
+        {(searchResults.length > 0 || isSearching) && searchQuery.length >= 2 ? (
+          <ScrollArea className="flex-1 overflow-hidden">
+            <div className="p-2">
+              {isSearching ? (
+                <div className="p-3 text-sm text-muted-foreground text-center">
+                  Searching...
+                </div>
+              ) : searchResults.length === 0 ? (
+                <div className="p-3 text-sm text-muted-foreground text-center">
+                  No results found
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-2 mb-2">
+                    Search Results
+                  </div>
+                  {searchResults.map((result) => (
+                    <div
+                      key={result.id}
+                      className="px-2 py-2 hover:bg-muted cursor-pointer rounded-md"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        handleSearchResultClick(result);
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="font-medium text-sm truncate">{result.title}</span>
+                      </div>
+                      {result.snippet && (
+                        <div className="text-xs text-muted-foreground mt-1 line-clamp-2 pl-6">
+                          {result.snippet}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        ) : (
+          /* Sessions list */
+          <ScrollArea className="flex-1 overflow-hidden">
           <div className="p-2 space-y-3 overflow-hidden">
             {/* Folders Section */}
             {(folders.length > 0 || isCreatingFolder) && (
@@ -810,6 +934,7 @@ export function SessionPane({
             )}
           </div>
         </ScrollArea>
+        )}
       </div>
 
       {/* Delete session confirmation dialog */}

@@ -1,16 +1,22 @@
 /**
  * Memory Service - MemGPT-style Multi-Tier Memory System
  * 
- * Three-tier memory architecture:
+ * Four-tier memory architecture:
  * - Tier 1: Working Context (recent turns + session summary)
  * - Tier 2: Session Memory (relevant past turns + session facts via vector search)
  * - Tier 3: Long-term Memory (user profile facts across sessions)
+ * - Tier 4: Context Graph (entity links to domain knowledge graph)
+ * 
+ * Features progressive summarization with sliding window compression.
  */
 
 import { db, sessions, messages, sessionMemoryFacts, userMemory, userMemories } from '@/lib/db';
 import { chat } from '@/lib/llm';
 import { eq, desc, and, sql } from 'drizzle-orm';
 import { getEmbedding } from './embeddings';
+import { CompressionService, formatCompressedContext } from './compression-service';
+import { ContextGraphService } from './context-graph-service';
+import { getBudgetForMode } from './token-counter';
 import {
   MemoryContext,
   MemoryFact,
@@ -106,13 +112,13 @@ export class MemoryService {
   /**
    * Update memory after a conversation turn
    */
-  async updateAfterTurn(input: UpdateAfterTurnInput): Promise<void> {
+  async updateAfterTurn(input: UpdateAfterTurnInput): Promise<{ sessionFactsSaved: number; userFactsSaved: number; summaryUpdated: boolean } | null> {
     const { sessionId, userId, messages: inputMessages, answer, config } = input;
 
     // If memory or autoSave is disabled, skip
     if (!config.memoryEnabled || !config.autoSaveMemories) {
       console.log('[MemoryService] Memory update skipped (disabled or autoSave off)');
-      return;
+      return null;
     }
 
     try {
@@ -134,9 +140,14 @@ export class MemoryService {
         f => (f.importance || 0.5) >= threshold
       );
 
+      console.log(`[MemoryService] Extracted ${writerOutput.sessionFacts.length} session facts, ${filteredSessionFacts.length} passed threshold`);
+      console.log(`[MemoryService] Extracted ${writerOutput.userFacts.length} user facts, ${filteredUserFacts.length} passed threshold`);
+
       // Save session facts
+      const savedFactIds: string[] = [];
       if (filteredSessionFacts.length > 0) {
-        await this.saveSessionFacts(sessionId, filteredSessionFacts);
+        const ids = await this.saveSessionFacts(sessionId, filteredSessionFacts);
+        savedFactIds.push(...ids);
         console.log(`[MemoryService] Saved ${filteredSessionFacts.length} session facts`);
       }
 
@@ -150,9 +161,63 @@ export class MemoryService {
       if (config.includeSessionSummaries && (inputMessages.length % 4 === 0 || writerOutput.summary)) {
         await this.updateSessionSummary(sessionId, inputMessages, writerOutput.summary);
       }
+
+      // Tier 4: Auto-link entities to knowledge graph (bridge layer)
+      if (userId) {
+        try {
+          const contextGraph = new ContextGraphService(userId);
+          const userMessage = inputMessages[inputMessages.length - 1];
+          
+          // Link entities from user query and assistant response
+          await contextGraph.autoLinkEntities({
+            text: userMessage.content,
+            sessionId,
+            refType: 'queried',
+          });
+          
+          await contextGraph.autoLinkEntities({
+            text: answer.substring(0, 1000), // Limit to avoid over-linking
+            sessionId,
+            refType: 'discussed',
+          });
+
+          // Link saved facts to entities
+          for (const factId of savedFactIds) {
+            const fact = filteredSessionFacts.find(f => f.id === factId);
+            if (fact) {
+              await contextGraph.autoLinkEntities({
+                text: `${fact.key}: ${fact.value}`,
+                sessionId,
+                refType: 'mentioned',
+                memoryFactId: factId,
+              });
+            }
+          }
+        } catch (e) {
+          console.warn('[MemoryService] Entity linking failed (non-critical):', e);
+        }
+      }
+
+      // Progressive summarization: check if compression is needed
+      let summaryUpdated = false;
+      try {
+        const compressionService = new CompressionService();
+        await compressionService.maybeCompress(sessionId, 20);
+        summaryUpdated = true;
+      } catch (e) {
+        console.warn('[MemoryService] Compression check failed (non-critical):', e);
+      }
+
+      // Return the counts so the caller can emit events
+      return {
+        sessionFactsSaved: filteredSessionFacts.length,
+        userFactsSaved: filteredUserFacts.length,
+        summaryUpdated,
+      };
     } catch (e: unknown) {
       const errorMessage = e instanceof Error ? e.message : 'Unknown error';
       console.error(`[MemoryService] Failed to update memory: ${errorMessage}`);
+      return null;
     }
   }
 
@@ -568,20 +633,30 @@ Respond with ONLY valid JSON (no markdown):
   ]
 }`;
 
+      console.log('[MemoryService] Starting LLM extraction call...');
+      
       // Use memory_extractor role for efficient extraction
-      const response = await chat('memory_extractor', [
-        {
-          role: 'system',
-          content: 'You are a memory extraction system. Respond only with valid JSON.'
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
-      ], {
-        temperature: 0.2,
-        maxTokens: 500,
-      });
+      let response;
+      try {
+        response = await chat('memory_extractor', [
+          {
+            role: 'system',
+            content: 'You are a memory extraction system. Extract facts and respond ONLY with valid JSON in this format: {"sessionFacts": [{"key": "name", "value": "John", "importance": 0.8}], "userFacts": []}'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ], {
+          temperature: 0.2,
+          maxTokens: 500,
+        });
+      } catch (llmError) {
+        console.error('[MemoryService] LLM extraction call failed:', llmError);
+        return { sessionFacts: [], userFacts: [] };
+      }
+
+      console.log('[MemoryService] LLM response content:', response.content?.substring(0, 200));
 
       // Parse response
       let content = response.content || '{}';
@@ -617,23 +692,30 @@ Respond with ONLY valid JSON (no markdown):
   // Persistence
   // ============================================================================
 
-  private async saveSessionFacts(sessionId: string, facts: MemoryFact[]): Promise<void> {
+  private async saveSessionFacts(sessionId: string, facts: MemoryFact[]): Promise<string[]> {
+    const savedIds: string[] = [];
     try {
       for (const fact of facts) {
         const embedding = await getEmbedding(`${fact.key}: ${fact.value}`);
         
-        await db.insert(sessionMemoryFacts).values({
+        const result = await db.insert(sessionMemoryFacts).values({
           sessionId,
           factType: fact.type,
           key: fact.key,
           value: fact.value,
           importance: fact.importance || 0.5,
           embedding
-        });
+        }).returning({ id: sessionMemoryFacts.id });
+        
+        if (result[0]?.id) {
+          savedIds.push(result[0].id);
+          fact.id = result[0].id; // Update fact with ID for entity linking
+        }
       }
     } catch (e) {
       console.error('[MemoryService] Failed to save session facts:', e);
     }
+    return savedIds;
   }
 
   private async saveUserFacts(
