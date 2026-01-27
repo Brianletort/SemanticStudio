@@ -1,6 +1,6 @@
-# AgentKit Chat System Architecture
+# SemanticStudio Chat System Architecture
 
-This document describes the architecture of the AgentKit multi-agent chat system, including its configurable modes, extensible domain agents, and the complete request flow.
+This document describes the architecture of the SemanticStudio multi-agent chat system, including its configurable modes, extensible domain agents, and the complete request flow.
 
 ## Table of Contents
 
@@ -17,7 +17,7 @@ This document describes the architecture of the AgentKit multi-agent chat system
 
 ## System Overview
 
-AgentKit is a fully configurable, multi-agent chat platform designed for enterprise data access. Key features:
+SemanticStudio is a fully configurable, multi-agent chat platform designed for enterprise data access. Key features:
 
 - **4 Chat Modes**: quick, think, deep, research - each with different depth/speed tradeoffs
 - **28 Default Domain Agents**: Covering 6 business categories
@@ -190,7 +190,7 @@ sequenceDiagram
 
 ## Chat Modes
 
-AgentKit provides 4 chat modes, each optimized for different use cases. Users can select a mode explicitly or use "auto" mode for automatic classification.
+SemanticStudio provides 4 chat modes, each optimized for different use cases. Users can select a mode explicitly or use "auto" mode for automatic classification.
 
 ### Mode Comparison
 
@@ -484,7 +484,7 @@ sequenceDiagram
 
 ## Configuration System
 
-AgentKit uses a 3-layer configuration system that allows customization at multiple levels.
+SemanticStudio uses a 3-layer configuration system that allows customization at multiple levels.
 
 ### Configuration Hierarchy
 
@@ -529,7 +529,7 @@ Environment variables provide base configuration for infrastructure and API acce
 
 ```bash
 # Database
-DATABASE_URL=postgres://user:pass@localhost:5433/agentkit
+DATABASE_URL=postgres://user:pass@localhost:5433/semanticstudio
 
 # LLM Providers
 OPENAI_API_KEY=sk-...
@@ -993,7 +993,7 @@ flowchart TB
 
 ## Summary
 
-AgentKit's architecture enables:
+SemanticStudio's architecture enables:
 
 1. **Flexible Query Processing**: 4 modes from quick lookups to deep research
 2. **Unlimited Domain Agents**: Database-driven agent registry with 28 defaults

@@ -233,7 +233,7 @@ ON CONFLICT (role) DO NOTHING;
 
 -- Insert default user for development
 INSERT INTO users (id, email, name) VALUES
-  ('00000000-0000-0000-0000-000000000001', 'dev@agentkit.local', 'Development User')
+  ('00000000-0000-0000-0000-000000000001', 'dev@semanticstudio.local', 'Development User')
 ON CONFLICT (id) DO NOTHING;
 
 -- ============================================

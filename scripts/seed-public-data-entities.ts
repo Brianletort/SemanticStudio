@@ -8,7 +8,7 @@
 import { Pool } from 'pg';
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://agentkit:agentkit@localhost:5433/agentkit',
+  connectionString: process.env.DATABASE_URL || 'postgresql://semanticstudio:semanticstudio@localhost:5433/semanticstudio',
 });
 
 async function seed() {

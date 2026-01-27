@@ -30,7 +30,7 @@ test.describe('Core Session Management', () => {
     // Click new chat button
     await clickNewChat(page);
     
-    // Verify empty/welcome state - AgentKit shows "Welcome to AgentKit"
+    // Verify empty/welcome state - SemanticStudio shows "Welcome to SemanticStudio"
     const welcomeText = getWelcomeHeading(page);
     await expect(welcomeText).toBeVisible({ timeout: 5000 });
   });

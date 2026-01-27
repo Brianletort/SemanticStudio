@@ -1,10 +1,10 @@
 # Documentation Images
 
-This folder contains screenshots and diagrams used in AgentKit documentation.
+This folder contains screenshots and diagrams used in SemanticStudio documentation.
 
 ## Required Screenshots
 
-Please capture the following screenshots from a running AgentKit instance:
+Please capture the following screenshots from a running SemanticStudio instance:
 
 | Filename | Description | Recommended Size |
 |----------|-------------|------------------|

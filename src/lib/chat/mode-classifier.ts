@@ -16,7 +16,7 @@ import { streamChat } from '@/lib/llm';
 import type { ChatMode, ModeClassification } from './types';
 
 // =============================================================================
-// DOMAIN INDICATORS - Business domains for agentkit
+// DOMAIN INDICATORS - Business domains for SemanticStudio
 // =============================================================================
 
 const DOMAIN_INDICATORS: Record<string, RegExp> = {

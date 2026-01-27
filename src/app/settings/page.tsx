@@ -705,7 +705,7 @@ export default function SettingsPage() {
                           Enable memory system
                         </Label>
                         <p className="text-sm text-muted-foreground">
-                          Let AgentKit remember context across conversations
+                          Let SemanticStudio remember context across conversations
                         </p>
                       </div>
                       <Switch
@@ -1039,7 +1039,7 @@ export default function SettingsPage() {
                         <Network className="h-12 w-12 mx-auto mb-4 opacity-50" />
                         <p>No entity references yet</p>
                         <p className="text-sm">
-                          As you chat, AgentKit will track entities you discuss
+                          As you chat, SemanticStudio will track entities you discuss
                         </p>
                       </div>
                     ) : (

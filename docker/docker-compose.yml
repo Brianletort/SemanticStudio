@@ -1,25 +1,25 @@
 services:
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: agentkit-postgres
+    container_name: semanticstudio-postgres
     environment:
-      POSTGRES_DB: agentkit
-      POSTGRES_USER: agentkit
-      POSTGRES_PASSWORD: agentkit
+      POSTGRES_DB: semanticstudio
+      POSTGRES_USER: semanticstudio
+      POSTGRES_PASSWORD: semanticstudio
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "5433:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U agentkit -d agentkit"]
+      test: ["CMD-SHELL", "pg_isready -U semanticstudio -d semanticstudio"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
-    container_name: agentkit-redis
+    container_name: semanticstudio-redis
     ports:
       - "6379:6379"
     healthcheck:

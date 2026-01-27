@@ -1,7 +1,7 @@
 /**
  * Chat Test Framework
  * 
- * A comprehensive testing framework for the AgentKit chat application.
+ * A comprehensive testing framework for the SemanticStudio chat application.
  * Uses browser MCP tools for automated UI testing with self-healing capabilities.
  * 
  * Usage:

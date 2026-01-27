@@ -1,5 +1,5 @@
 <p align="center">
-  <h1 align="center">AgentKit</h1>
+  <h1 align="center">SemanticStudio</h1>
   <p align="center">
     An enterprise-ready, data-first multi-agent chat platform with configurable domain agents, multiple LLM provider support, and self-learning ETL pipelines.
   </p>
@@ -25,14 +25,14 @@
 ---
 
 <p align="center">
-  <img src="docs/images/hero-chat.png" alt="AgentKit Chat Interface" width="800">
+  <img src="docs/images/hero-chat.png" alt="SemanticStudio Chat Interface" width="800">
 </p>
 
 ## Overview
 
-AgentKit is a production-ready multi-agent chat platform that enables intelligent conversations across your organization's data. It combines the power of modern LLMs with a sophisticated domain agent architecture to provide contextual, accurate responses grounded in your data.
+SemanticStudio is a production-ready multi-agent chat platform that enables intelligent conversations across your organization's data. It combines the power of modern LLMs with a sophisticated domain agent architecture to provide contextual, accurate responses grounded in your data.
 
-**Why AgentKit?**
+**Why SemanticStudio?**
 
 - **Get running fast** — Clone, configure one API key, and have a working enterprise AI assistant in minutes
 - **Enterprise-class architecture** — Built for scale with PostgreSQL, vector search, and streaming responses
@@ -278,7 +278,7 @@ All events are:
 
 ## Quick Start
 
-Get AgentKit running in under 5 minutes.
+Get SemanticStudio running in under 5 minutes.
 
 ### Prerequisites
 
@@ -291,8 +291,8 @@ Get AgentKit running in under 5 minutes.
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/Brianletort/AgentKit.git
-   cd agentkit
+   git clone https://github.com/Brianletort/SemanticStudio.git
+   cd semanticstudio
    ```
 
 2. **Install dependencies**
@@ -346,7 +346,7 @@ Get AgentKit running in under 5 minutes.
 
 ### First Run
 
-On first launch, AgentKit will:
+On first launch, SemanticStudio will:
 - Initialize the database schema
 - Create 28 default domain agents
 - Set up sample data for demonstration
@@ -361,7 +361,7 @@ You can start chatting immediately or configure your own data sources through th
    - **Files**: Upload CSV, JSON, or documents
    - **APIs**: Configure REST endpoint with auth
 3. Create an **ETL Job** to import and process the data
-4. Run the job — AgentKit will extract entities and build the knowledge graph
+4. Run the job — SemanticStudio will extract entities and build the knowledge graph
 5. Link data sources to domain agents for querying
 
 ### Production Deployment
@@ -380,7 +380,7 @@ npm start
 
 ```env
 NODE_ENV=production
-DATABASE_URL=postgresql://user:pass@host:5432/agentkit
+DATABASE_URL=postgresql://user:pass@host:5432/semanticstudio
 OPENAI_API_KEY=sk-...
 
 # Optional: Enable specific features
@@ -391,15 +391,15 @@ AZURE_SEARCH_ENDPOINT=...       # Azure Cognitive Search
 **Docker Deployment:**
 
 ```bash
-docker build -t agentkit .
-docker run -p 3000:3000 --env-file .env.production agentkit
+docker build -t semanticstudio .
+docker run -p 3000:3000 --env-file .env.production semanticstudio
 ```
 
 ---
 
 ## Architecture
 
-AgentKit uses a layered architecture designed for extensibility and performance.
+SemanticStudio uses a layered architecture designed for extensibility and performance.
 
 ### High-Level Overview
 
@@ -481,7 +481,7 @@ sequenceDiagram
 ### Project Structure
 
 ```
-agentkit/
+semanticstudio/
 ├── src/
 │   ├── app/                    # Next.js App Router
 │   │   ├── (chat)/             # Chat interface routes
@@ -567,7 +567,7 @@ Each mode has configurable parameters that can be customized per-user:
 
 ## Memory System
 
-AgentKit implements a MemGPT-inspired **4-tier memory system** for personalized, context-aware conversations with knowledge graph integration.
+SemanticStudio implements a MemGPT-inspired **4-tier memory system** for personalized, context-aware conversations with knowledge graph integration.
 
 ### Memory Tiers
 
@@ -624,11 +624,11 @@ Configure memory behavior in **Settings → Memory Configuration**.
 
 ## Task Agent Framework
 
-AgentKit includes a powerful **Task Agent Framework** for orchestrating agents that perform real-world actions. This enables the chat system to not just answer questions, but to **take action** on behalf of users—updating CRMs, scheduling meetings, querying databases, and more.
+SemanticStudio includes a powerful **Task Agent Framework** for orchestrating agents that perform real-world actions. This enables the chat system to not just answer questions, but to **take action** on behalf of users—updating CRMs, scheduling meetings, querying databases, and more.
 
 ### The Power of Agent Coordination
 
-Traditional chatbots answer questions. AgentKit goes further by enabling **agentic workflows** where:
+Traditional chatbots answer questions. SemanticStudio goes further by enabling **agentic workflows** where:
 
 - **Chat identifies intent** → "Close the Acme deal in Salesforce"
 - **Framework routes to agent** → Salesforce Agent selected

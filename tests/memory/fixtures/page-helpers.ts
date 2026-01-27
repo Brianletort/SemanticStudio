@@ -1,7 +1,7 @@
 /**
- * Page Helpers for AgentKit E2E Tests
+ * Page Helpers for SemanticStudio E2E Tests
  * 
- * Provides helper functions with correct selectors for the AgentKit UI.
+ * Provides helper functions with correct selectors for the SemanticStudio UI.
  */
 
 import { type Page, expect } from '@playwright/test';
@@ -22,7 +22,7 @@ export async function waitForPageLoad(page: Page) {
  * Uses Enter key to submit since the button can be intercepted
  */
 export async function sendMessage(page: Page, message: string) {
-  // Find the chat input - AgentKit uses "Ask anything about your business data..."
+  // Find the chat input - SemanticStudio uses "Ask anything about your business data..."
   const input = page.locator('textarea[placeholder*="Ask anything"]');
   await input.fill(message);
   
@@ -59,7 +59,7 @@ export async function waitForResponse(page: Page, timeout: number = RESPONSE_TIM
  * Click the New Chat button to create a new session
  */
 export async function clickNewChat(page: Page) {
-  // AgentKit has both "New chat" and "New Chat" buttons
+  // SemanticStudio has both "New chat" and "New Chat" buttons
   const newChatButton = page.locator('button:has-text("New chat")').first();
   await newChatButton.click();
   await page.waitForTimeout(500);
@@ -69,7 +69,7 @@ export async function clickNewChat(page: Page) {
  * Get the welcome heading element
  */
 export function getWelcomeHeading(page: Page) {
-  return page.locator('h2:has-text("Welcome to AgentKit")');
+  return page.locator('h2:has-text("Welcome to SemanticStudio")');
 }
 
 /**
@@ -135,7 +135,7 @@ export async function responseContains(page: Page, text: string): Promise<boolea
  * Get the last assistant message
  */
 export function getLastAssistantMessage(page: Page) {
-  // In AgentKit, assistant messages appear after user messages
+  // In SemanticStudio, assistant messages appear after user messages
   // Look for response-like content patterns
   return page.locator('text=/received|Here|Based on|Let me|I can help/i').last();
 }

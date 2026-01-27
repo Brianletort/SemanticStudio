@@ -743,7 +743,7 @@ Include citations and sources for all findings.`,
     }
 
     // Build system prompt with retrieved context, memory, personalization, and file context
-    const systemPrompt = `You are AgentKit, a helpful AI assistant that helps users understand and analyze their business data.
+    const systemPrompt = `You are SemanticStudio, a helpful AI assistant that helps users understand and analyze their business data.
 
 You have access to a multi-domain knowledge system with these capabilities:
 - **Customer Domain**: Customer profiles, segments, lifetime value, health scores

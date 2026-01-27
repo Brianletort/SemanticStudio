@@ -24,7 +24,7 @@ export default function AdminDashboard() {
         <div className="max-w-6xl mx-auto space-y-6">
           {/* Welcome section */}
           <div className="space-y-2">
-            <h2 className="text-3xl font-bold">Welcome to AgentKit Admin</h2>
+            <h2 className="text-3xl font-bold">Welcome to SemanticStudio Admin</h2>
             <p className="text-muted-foreground">
               Manage your domain agents, configure models, and monitor your data pipelines.
             </p>
@@ -56,7 +56,7 @@ export default function AdminDashboard() {
                   <MessageSquare className="h-5 w-5" />
                   Quick Start
                 </CardTitle>
-                <CardDescription>Get started with AgentKit</CardDescription>
+                <CardDescription>Get started with SemanticStudio</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">

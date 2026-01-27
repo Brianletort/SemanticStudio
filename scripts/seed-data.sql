@@ -1,4 +1,4 @@
--- AgentKit Sample Data Seed Script
+-- SemanticStudio Sample Data Seed Script
 -- This script populates the database with domain agents and sample data for Acme Global Inc.
 
 -- ============================================

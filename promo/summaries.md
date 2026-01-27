@@ -1,18 +1,18 @@
-# AgentKit LinkedIn Promotional Content
+# SemanticStudio LinkedIn Promotional Content
 
 ## Overview
-AgentKit is an open-source, enterprise-grade multi-agent chat platform that connects AI to your business data. Built for configurability, it features 28 domain agents, 4 intelligent chat modes, a 3D knowledge graph, and a 3-tier memory system.
+SemanticStudio is an open-source, enterprise-grade multi-agent chat platform that connects AI to your business data. Built for configurability, it features 28 domain agents, 4 intelligent chat modes, a 3D knowledge graph, and a 3-tier memory system.
 
 ---
 
 ## LinkedIn Post 1: Launch Announcement
 
-**Hook:** Meet AgentKit — the AI that actually knows your business.
+**Hook:** Meet SemanticStudio — the AI that actually knows your business.
 
 **Body:**
 Most enterprise AI tools are black boxes. You ask a question about your customers, and you get generic answers based on general knowledge.
 
-AgentKit is different.
+SemanticStudio is different.
 
 We built a multi-agent platform designed for enterprise data access:
 
@@ -37,7 +37,7 @@ Your data stays yours. Your AI, your way.
 **Hook:** 28 agents. 4 modes. 1 question: How does it work?
 
 **Body:**
-I've been building AgentKit, an open-source multi-agent chat system.
+I've been building SemanticStudio, an open-source multi-agent chat system.
 
 Here's how the architecture breaks down:
 
@@ -71,7 +71,7 @@ Every step is configurable through the Admin UI. No code changes required.
 **Hook:** Your data has relationships. Your AI should understand them.
 
 **Body:**
-One of my favorite features in AgentKit: the interactive 3D knowledge graph.
+One of my favorite features in SemanticStudio: the interactive 3D knowledge graph.
 
 Traditional RAG retrieves chunks of text. But business data isn't just text — it's connected:
 
@@ -79,7 +79,7 @@ Traditional RAG retrieves chunks of text. But business data isn't just text — 
 • Employees → Teams → Projects → Tickets
 • Opportunities → Contacts → Companies → Revenue
 
-AgentKit's GraphRAG-lite doesn't just find relevant documents. It traverses relationships.
+SemanticStudio's GraphRAG-lite doesn't just find relevant documents. It traverses relationships.
 
 Ask "Who are our top customers?" and it doesn't just search a customer table. It:
 
@@ -103,7 +103,7 @@ Because sometimes the best insights come from connections you didn't know existe
 **Hook:** "Can you customize it?" Yes. Everything.
 
 **Body:**
-The #1 question I get about AgentKit: "How customizable is it?"
+The #1 question I get about SemanticStudio: "How customizable is it?"
 
 Answer: Completely.
 
@@ -137,7 +137,7 @@ Enterprise-ready means fitting YOUR enterprise, not the other way around.
 1. "28 agents. 4 modes. Your data, intelligently connected."
 2. "Enterprise AI that adapts to you — not the other way around."
 3. "From quick answers to deep research. One platform, infinite possibilities."
-4. "Your data has stories. AgentKit helps you find them."
+4. "Your data has stories. SemanticStudio helps you find them."
 5. "Multi-agent AI, fully configurable, 100% open source."
 
 ---

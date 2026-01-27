@@ -1,6 +1,6 @@
-# Contributing to AgentKit
+# Contributing to SemanticStudio
 
-Thank you for your interest in contributing to AgentKit! This document provides guidelines and information for contributors.
+Thank you for your interest in contributing to SemanticStudio! This document provides guidelines and information for contributors.
 
 ## Table of Contents
 
@@ -44,14 +44,14 @@ Before you begin, ensure you have:
 2. Clone your fork locally:
 
    ```bash
-   git clone https://github.com/YOUR_USERNAME/agentkit.git
-   cd agentkit
+   git clone https://github.com/YOUR_USERNAME/semanticstudio.git
+   cd semanticstudio
    ```
 
 3. Add the upstream remote:
 
    ```bash
-   git remote add upstream https://github.com/ORIGINAL_ORG/agentkit.git
+   git remote add upstream https://github.com/ORIGINAL_ORG/semanticstudio.git
    ```
 
 ---
@@ -338,10 +338,10 @@ export async function retrieveDomainContext(
 
 ## Questions?
 
-- Open a [Discussion](https://github.com/ORIGINAL_ORG/agentkit/discussions) for questions
-- Check existing [Issues](https://github.com/ORIGINAL_ORG/agentkit/issues) before creating new ones
+- Open a [Discussion](https://github.com/ORIGINAL_ORG/semanticstudio/discussions) for questions
+- Check existing [Issues](https://github.com/ORIGINAL_ORG/semanticstudio/issues) before creating new ones
 - Join our community chat (if available)
 
 ---
 
-Thank you for contributing to AgentKit!
+Thank you for contributing to SemanticStudio!

@@ -6,7 +6,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { Providers } from "@/components/providers";
 
 export const metadata: Metadata = {
-  title: "AgentKit - Multi-Agent Chat Platform",
+  title: "SemanticStudio - Multi-Agent Chat Platform",
   description: "Data-first multi-agent chat platform with domain agents",
 };
 

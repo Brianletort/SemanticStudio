@@ -1,6 +1,6 @@
-# AgentKit Promotional Collateral
+# SemanticStudio Promotional Collateral
 
-This directory contains assets and scripts for creating promotional content for AgentKit.
+This directory contains assets and scripts for creating promotional content for SemanticStudio.
 
 ## Directory Structure
 
@@ -23,7 +23,7 @@ npm install -D playwright
 npx playwright install chromium
 ```
 
-### 2. Ensure AgentKit is Running
+### 2. Ensure SemanticStudio is Running
 
 ```bash
 npm run dev
@@ -44,7 +44,7 @@ npx tsx promo/capture-tour.ts
 ffmpeg -framerate 0.5 -pattern_type glob -i 'promo/screenshots/tour-*.png' \
   -c:v libx264 -r 30 -pix_fmt yuv420p \
   -vf "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2" \
-  promo/video/agentkit-tour.mp4
+  promo/video/semanticstudio-tour.mp4
 ```
 
 #### Video Options
@@ -53,7 +53,7 @@ ffmpeg -framerate 0.5 -pattern_type glob -i 'promo/screenshots/tour-*.png' \
 ```bash
 ffmpeg -framerate 0.33 -pattern_type glob -i 'promo/screenshots/tour-*.png' \
   -c:v libx264 -r 30 -pix_fmt yuv420p \
-  promo/video/agentkit-tour-slow.mp4
+  promo/video/semanticstudio-tour-slow.mp4
 ```
 
 **With fade transitions:**
@@ -61,14 +61,14 @@ ffmpeg -framerate 0.33 -pattern_type glob -i 'promo/screenshots/tour-*.png' \
 ffmpeg -framerate 0.5 -pattern_type glob -i 'promo/screenshots/tour-*.png' \
   -vf "zoompan=z='if(lte(zoom,1.0),1.05,max(1.001,zoom-0.0015))':d=60:s=1920x1080,fade=t=in:st=0:d=0.5,fade=t=out:st=1.5:d=0.5" \
   -c:v libx264 -pix_fmt yuv420p \
-  promo/video/agentkit-tour-fade.mp4
+  promo/video/semanticstudio-tour-fade.mp4
 ```
 
 **GIF for social (lower quality, smaller file):**
 ```bash
 ffmpeg -framerate 0.5 -pattern_type glob -i 'promo/screenshots/tour-*.png' \
   -vf "scale=960:540,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" \
-  promo/video/agentkit-tour.gif
+  promo/video/semanticstudio-tour.gif
 ```
 
 ## Manual Screenshot Capture Guide

@@ -97,7 +97,7 @@ export function ChatMessages({ messages, isLoading = false }: ChatMessagesProps)
         {messages.length === 0 && !isLoading && (
           <div className="flex flex-col items-center justify-center h-[50vh] text-center">
             <Bot className="h-16 w-16 text-muted-foreground mb-4" />
-            <h2 className="text-2xl font-semibold mb-2">Welcome to AgentKit</h2>
+            <h2 className="text-2xl font-semibold mb-2">Welcome to SemanticStudio</h2>
             <p className="text-muted-foreground max-w-md">
               Ask me anything about your business data. I can help with customer insights,
               sales analytics, financial reports, and much more.

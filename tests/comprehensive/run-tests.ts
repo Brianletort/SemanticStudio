@@ -79,7 +79,7 @@ function generateReport(history: unknown[], outputPath: string) {
 async function main() {
   const args = parseArgs();
   
-  console.log('\n🧪 AgentKit Comprehensive Test Suite\n');
+  console.log('\n🧪 SemanticStudio Comprehensive Test Suite\n');
   console.log('Configuration:');
   console.log(`  Category: ${args.category || 'all'}`);
   console.log(`  PAR Loops: ${args.parLoops}`);

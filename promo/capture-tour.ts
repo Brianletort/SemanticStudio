@@ -1,5 +1,5 @@
 /**
- * AgentKit Product Tour Screenshot Capture v2
+ * SemanticStudio Product Tour Screenshot Capture v2
  * 
  * Fast-paced, comprehensive tour showcasing all features
  * Run with: npx tsx promo/capture-tour.ts
@@ -35,7 +35,7 @@ async function wait(ms: number) {
 }
 
 async function main() {
-  console.log('🎬 AgentKit Product Tour v2 - Comprehensive Feature Showcase\n');
+  console.log('🎬 SemanticStudio Product Tour v2 - Comprehensive Feature Showcase\n');
   
   const browser = await chromium.launch({ 
     headless: false,

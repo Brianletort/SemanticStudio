@@ -1,5 +1,5 @@
 /**
- * AgentKit Dynamic Demo Video
+ * SemanticStudio Dynamic Demo Video
  * 
  * Shows live chat interactions, agent traces, different modes, and image generation
  * Run with: npx tsx promo/capture-dynamic-tour.ts
@@ -67,7 +67,7 @@ async function waitForResponse(page: Page, maxWait: number = 30000) {
 }
 
 async function main() {
-  console.log('🎬 AgentKit Dynamic Demo - Live Chat Interactions\n');
+  console.log('🎬 SemanticStudio Dynamic Demo - Live Chat Interactions\n');
   
   const browser = await chromium.launch({ 
     headless: false,

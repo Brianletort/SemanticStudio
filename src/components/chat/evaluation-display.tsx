@@ -133,10 +133,8 @@ export function EvaluationDisplay({
     return null;
   }
 
-  // Skip evaluation display for quick mode
-  if (mode === 'quick') {
-    return null;
-  }
+  // Note: Previously skipped evaluation for quick mode, but user wants evaluation for ALL modes
+  // Evaluation will still run with appropriate polling config for each mode
   
   const getQualityColor = (score: number) => {
     if (score >= 0.8) return "text-green-600 dark:text-green-400";

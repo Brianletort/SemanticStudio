@@ -14,7 +14,7 @@
  *   npx ts-node tests/comprehensive/api-test-runner.ts
  */
 
-const BASE_URL = process.env.AGENTKIT_URL || 'http://localhost:3001';
+const BASE_URL = process.env.SEMANTICSTUDIO_URL || 'http://localhost:3001';
 const DEV_USER_ID = '00000000-0000-0000-0000-000000000001';
 
 interface TestResult {
@@ -842,7 +842,7 @@ const tests: Array<{
 
 async function runTests() {
   console.log('\n' + '='.repeat(60));
-  console.log('  AgentKit API Test Runner');
+  console.log('  SemanticStudio API Test Runner');
   console.log('='.repeat(60) + '\n');
   
   console.log(`Base URL: ${BASE_URL}`);

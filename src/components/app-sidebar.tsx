@@ -56,7 +56,7 @@ export function AppSidebar() {
             <Bot className="h-5 w-5" />
           </div>
           <div className="flex flex-col">
-            <span className="font-semibold">AgentKit</span>
+            <span className="font-semibold">SemanticStudio</span>
             <span className="text-xs text-muted-foreground">Multi-Agent Chat</span>
           </div>
         </Link>
@@ -102,7 +102,7 @@ export function AppSidebar() {
 
       <SidebarFooter className="border-t border-sidebar-border p-4">
         <div className="text-xs text-muted-foreground">
-          <p>AgentKit v0.1.0</p>
+          <p>SemanticStudio v0.1.0</p>
           <p>Open Source Multi-Agent Platform</p>
         </div>
       </SidebarFooter>
