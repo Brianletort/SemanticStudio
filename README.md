@@ -790,6 +790,7 @@ For complete API documentation, see the [API Reference](docs/api-reference.md).
 ## Technology Stack
 
 - **Frontend**: Next.js 16, React 19, Tailwind CSS 4, shadcn/ui, Radix UI
+- **State Management**: Zustand for global state (session activity tracking, cross-component state)
 - **Backend**: Next.js API Routes, Node.js
 - **Database**: PostgreSQL 16 with pgvector
 - **ORM**: Drizzle ORM
@@ -859,6 +860,7 @@ Built with:
 - [Next.js](https://nextjs.org/) - React framework
 - [shadcn/ui](https://ui.shadcn.com/) - UI components
 - [Radix UI](https://www.radix-ui.com/) - Accessible component primitives
+- [Zustand](https://zustand-demo.pmnd.rs/) - Lightweight state management
 - [PostgreSQL](https://www.postgresql.org/) - Database
 - [pgvector](https://github.com/pgvector/pgvector) - Vector similarity search
 - [Drizzle ORM](https://orm.drizzle.team/) - TypeScript ORM

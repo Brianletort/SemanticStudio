@@ -47,9 +47,12 @@ import {
   FolderPlus,
   FolderInput,
   Search,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
+import { useIsSessionActive } from "@/stores/chat-store";
 
 export interface Session {
   id: string;
@@ -85,6 +88,21 @@ interface SessionPaneProps {
   onSessionSelect: (session: Session) => void;
   onNewSession: () => void;
   onSessionsChange: () => void;
+}
+
+// Small component to show session icon with loading spinner when active
+function SessionIcon({ sessionId, isPinned, showPinIcon }: { sessionId: string; isPinned?: boolean; showPinIcon: boolean }) {
+  const isActive = useIsSessionActive(sessionId);
+  
+  if (isActive) {
+    return <Loader2 className="h-4 w-4 mr-2 shrink-0 text-primary animate-spin" />;
+  }
+  
+  if (showPinIcon && isPinned) {
+    return <Pin className="h-4 w-4 mr-2 shrink-0 text-primary" />;
+  }
+  
+  return <MessageSquare className="h-4 w-4 mr-2 shrink-0 text-muted-foreground" />;
 }
 
 export function SessionPane({
@@ -443,17 +461,12 @@ export function SessionPane({
     <div
       key={session.id}
       className={cn(
-        "group rounded-md px-2 py-1.5 text-sm cursor-pointer hover:bg-muted",
+        "group rounded-md text-sm",
         session.id === currentSessionId && "bg-muted"
       )}
-      onClick={() => {
-        if (editingId !== session.id) {
-          onSessionSelect(session);
-        }
-      }}
     >
       {editingId === session.id ? (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 px-2 py-1.5">
           <Input
             value={editTitle}
             onChange={(e) => setEditTitle(e.target.value)}
@@ -463,16 +476,12 @@ export function SessionPane({
             }}
             className="h-6 text-sm flex-1"
             autoFocus
-            onClick={(e) => e.stopPropagation()}
           />
           <Button
             variant="ghost"
             size="icon"
             className="h-6 w-6 shrink-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleSaveRename();
-            }}
+            onClick={handleSaveRename}
           >
             <Check className="h-3 w-3" />
           </Button>
@@ -480,29 +489,30 @@ export function SessionPane({
             variant="ghost"
             size="icon"
             className="h-6 w-6 shrink-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleCancelRename();
-            }}
+            onClick={handleCancelRename}
           >
             <X className="h-3 w-3" />
           </Button>
         </div>
       ) : (
-        <div className="flex items-center w-full">
-          {showPinIcon && session.isPinned ? (
-            <Pin className="h-4 w-4 mr-2 shrink-0 text-primary" />
-          ) : (
-            <MessageSquare className="h-4 w-4 mr-2 shrink-0 text-muted-foreground" />
-          )}
-          <span className="truncate text-sm flex-1 min-w-0 mr-1">{session.title}</span>
+        <div className="flex items-center w-full hover:bg-muted rounded-md">
+          <Link 
+            href={`/chat/${session.id}`}
+            className="flex items-center flex-1 min-w-0 px-2 py-1.5"
+          >
+            <SessionIcon 
+              sessionId={session.id} 
+              isPinned={session.isPinned} 
+              showPinIcon={showPinIcon} 
+            />
+            <span className="truncate text-sm flex-1 min-w-0 mr-1">{session.title}</span>
+          </Link>
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
-                onClick={(e) => e.stopPropagation()}
+                className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground mr-1"
               >
                 <MoreVertical className="h-4 w-4" />
               </Button>
@@ -510,22 +520,12 @@ export function SessionPane({
             <DropdownMenuContent align="end">
               {/* Pin/Unpin option */}
               {session.isPinned ? (
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleUnpin(session);
-                  }}
-                >
+                <DropdownMenuItem onClick={() => handleUnpin(session)}>
                   <PinOff className="h-4 w-4 mr-2" />
                   Unpin
                 </DropdownMenuItem>
               ) : (
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handlePin(session);
-                  }}
-                >
+                <DropdownMenuItem onClick={() => handlePin(session)}>
                   <Pin className="h-4 w-4 mr-2" />
                   Pin
                 </DropdownMenuItem>
@@ -541,10 +541,7 @@ export function SessionPane({
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
                   <DropdownMenuItem
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleMoveToFolder(session, null);
-                    }}
+                    onClick={() => handleMoveToFolder(session, null)}
                     disabled={!session.folderId}
                   >
                     <X className="h-4 w-4 mr-2" />
@@ -554,10 +551,7 @@ export function SessionPane({
                   {folders.map(folder => (
                     <DropdownMenuItem
                       key={folder.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleMoveToFolder(session, folder.id);
-                      }}
+                      onClick={() => handleMoveToFolder(session, folder.id)}
                       disabled={session.folderId === folder.id}
                     >
                       <Folder className="h-4 w-4 mr-2" />
@@ -569,21 +563,13 @@ export function SessionPane({
               
               <DropdownMenuSeparator />
               
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleRename(session);
-                }}
-              >
+              <DropdownMenuItem onClick={() => handleRename(session)}>
                 <Edit2 className="h-4 w-4 mr-2" />
                 Rename
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-destructive"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteClick(session);
-                }}
+                onClick={() => handleDeleteClick(session)}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete
@@ -618,15 +604,13 @@ export function SessionPane({
         <div className="flex items-center justify-between p-3 border-b">
           <h2 className="font-semibold text-sm">Chat History</h2>
           <div className="flex items-center gap-1 shrink-0">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={onNewSession}
+            <Link
+              href="/chat"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-all h-7 w-7 hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50"
               title="New chat"
             >
               <Plus className="h-4 w-4" />
-            </Button>
+            </Link>
             <Button
               variant="ghost"
               size="icon"

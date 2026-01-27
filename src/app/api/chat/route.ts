@@ -3,8 +3,8 @@ import { streamChat, generateImage, deepResearch, getDeepResearchStatus } from "
 import { domainRetriever } from "@/lib/retrieval";
 import { braveSearch, formatSearchResultsForContext, isBraveSearchConfigured } from "@/lib/search";
 import { db } from "@/lib/db";
-import { userSettings } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { userSettings, messages as messagesTable } from "@/lib/db/schema";
+import { eq, desc, and } from "drizzle-orm";
 import type { ChatMessage, ModelRole } from "@/lib/llm/types";
 import type { RetrievalMode } from "@/lib/retrieval";
 import { 
@@ -34,6 +34,7 @@ import {
   type PipelineConfig,
 } from "@/lib/chat";
 import { v4 as uuidv4 } from "uuid";
+import { isValidUUID } from "@/lib/utils";
 
 export const runtime = "nodejs";
 // Research mode can take up to 30 minutes, so we set a high max duration
@@ -146,6 +147,14 @@ export async function POST(request: NextRequest) {
 
     if (!message) {
       return new Response(JSON.stringify({ error: "Message is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Validate sessionId if provided
+    if (sessionId && !isValidUUID(sessionId)) {
+      return new Response(JSON.stringify({ error: "Invalid session ID format" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
       });
@@ -438,8 +447,47 @@ export async function POST(request: NextRequest) {
       const clarificationAgent = createClarificationAgent();
       
       // Check if this is an answer to previous clarification questions
-      // (We would need to track this in session state - for now, check query specificity)
-      const clarificationResult = await clarificationAgent.analyze(message);
+      // by fetching the last assistant message from the session
+      let isAnswerToClarification = false;
+      let clarificationAnswers: Record<string, string> = {};
+      
+      if (sessionId) {
+        try {
+          const lastAssistantMessages = await db
+            .select({ content: messagesTable.content })
+            .from(messagesTable)
+            .where(
+              and(
+                eq(messagesTable.sessionId, sessionId),
+                eq(messagesTable.role, 'assistant')
+              )
+            )
+            .orderBy(desc(messagesTable.createdAt))
+            .limit(1);
+          
+          if (lastAssistantMessages.length > 0) {
+            const previousAssistantMessage = lastAssistantMessages[0].content;
+            isAnswerToClarification = clarificationAgent.detectClarificationAnswer(
+              message,
+              previousAssistantMessage
+            );
+            
+            if (isAnswerToClarification) {
+              // Extract the user's answers for use in research
+              clarificationAnswers = clarificationAgent.extractAnswers(message);
+              console.log('[Research] Detected clarification answer:', clarificationAnswers);
+            }
+          }
+        } catch (error) {
+          console.error('[Research] Error checking for clarification answer:', error);
+          // Continue with normal flow if check fails
+        }
+      }
+      
+      // Only ask clarification questions if this is NOT an answer to previous clarification
+      const clarificationResult = isAnswerToClarification 
+        ? { shouldClarify: false, questions: [], originalQuery: message, skipReason: 'User answered clarification questions' }
+        : await clarificationAgent.analyze(message);
       
       if (clarificationResult.shouldClarify) {
         // Emit clarification requested event
@@ -495,13 +543,20 @@ export async function POST(request: NextRequest) {
         });
       }
       
-      // Query is specific enough - proceed to deep research
+      // Query is specific enough (or user answered clarification) - proceed to deep research
       // Use o3-deep-research with background mode
       console.log('[Research] Starting deep research with o3-deep-research');
       
+      // Build clarification context if user answered questions
+      const clarificationContext = Object.keys(clarificationAnswers).length > 0
+        ? `\n## User Preferences (from clarification)\n${Object.entries(clarificationAnswers)
+            .map(([key, value]) => `- ${key}: ${value}`)
+            .join('\n')}`
+        : '';
+      
       // Build research input with context
       const researchInput = `${message}
-
+${clarificationContext}
 ${retrievalContext ? `\n## Available Data Context\n${retrievalContext}` : ''}
 ${memoryContextText ? `\n## User Context\n${memoryContextText}` : ''}`;
 

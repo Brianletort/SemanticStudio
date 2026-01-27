@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { sessions, messages } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { isValidUUID } from '@/lib/utils';
 
 // GET /api/sessions/[id] - Get a single session
 export async function GET(
@@ -10,6 +11,11 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+
+    // Validate UUID format to prevent invalid input errors
+    if (!isValidUUID(id)) {
+      return NextResponse.json({ error: 'Invalid session ID format' }, { status: 400 });
+    }
 
     const result = await db.select().from(sessions).where(eq(sessions.id, id)).limit(1);
     
@@ -31,6 +37,12 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
+
+    // Validate UUID format to prevent invalid input errors
+    if (!isValidUUID(id)) {
+      return NextResponse.json({ error: 'Invalid session ID format' }, { status: 400 });
+    }
+
     const body = await request.json();
     const { title, metadata, folderId } = body;
 
@@ -73,6 +85,11 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
+
+    // Validate UUID format to prevent invalid input errors
+    if (!isValidUUID(id)) {
+      return NextResponse.json({ error: 'Invalid session ID format' }, { status: 400 });
+    }
 
     // Delete messages first (cascade not always reliable)
     await db.delete(messages).where(eq(messages.sessionId, id));

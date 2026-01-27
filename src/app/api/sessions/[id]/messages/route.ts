@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { messages, sessions, generatedImages } from '@/lib/db/schema';
 import { eq, asc } from 'drizzle-orm';
+import { isValidUUID } from '@/lib/utils';
 
 // GET /api/sessions/[id]/messages - Get all messages for a session
 export async function GET(
@@ -10,6 +11,11 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+
+    // Validate UUID format to prevent invalid input errors
+    if (!isValidUUID(id)) {
+      return NextResponse.json({ error: 'Invalid session ID format' }, { status: 400 });
+    }
 
     // First check if session exists
     const sessionCheck = await db.select().from(sessions).where(eq(sessions.id, id)).limit(1);
@@ -91,6 +97,12 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
+
+    // Validate UUID format to prevent invalid input errors
+    if (!isValidUUID(id)) {
+      return NextResponse.json({ error: 'Invalid session ID format' }, { status: 400 });
+    }
+
     const body = await request.json();
     const { role, content, metadata } = body;
 

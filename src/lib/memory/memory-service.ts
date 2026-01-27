@@ -10,7 +10,7 @@
  * Features progressive summarization with sliding window compression.
  */
 
-import { db, sessions, messages, sessionMemoryFacts, userMemory, userMemories } from '@/lib/db';
+import { db, pgPool, sessions, messages, sessionMemoryFacts, userMemory, userMemories } from '@/lib/db';
 import { chat } from '@/lib/llm';
 import { eq, desc, and, sql } from 'drizzle-orm';
 import { getEmbedding } from './embeddings';
@@ -694,27 +694,39 @@ Respond with ONLY valid JSON (no markdown):
 
   private async saveSessionFacts(sessionId: string, facts: MemoryFact[]): Promise<string[]> {
     const savedIds: string[] = [];
-    try {
-      for (const fact of facts) {
-        const embedding = await getEmbedding(`${fact.key}: ${fact.value}`);
+    
+    for (const fact of facts) {
+      const factId = crypto.randomUUID();
+      
+      try {
+        const importance = fact.importance || 0.5;
         
-        const result = await db.insert(sessionMemoryFacts).values({
-          sessionId,
-          factType: fact.type,
-          key: fact.key,
-          value: fact.value,
-          importance: fact.importance || 0.5,
-          embedding
-        }).returning({ id: sessionMemoryFacts.id });
+        // Insert fact first (pgPool handles proper async/await)
+        await pgPool.query(
+          `INSERT INTO session_memory_facts (id, session_id, fact_type, key, value, importance)
+           VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6)`,
+          [factId, sessionId, fact.type || 'preference', fact.key, fact.value, importance]
+        );
         
-        if (result[0]?.id) {
-          savedIds.push(result[0].id);
-          fact.id = result[0].id; // Update fact with ID for entity linking
+        // Generate and update embedding (separate query to avoid vector param issues)
+        try {
+          const embedding = await getEmbedding(`${fact.key}: ${fact.value}`);
+          const embeddingStr = `[${embedding.join(',')}]`;
+          await pgPool.query(
+            `UPDATE session_memory_facts SET embedding = $1::vector WHERE id = $2::uuid`,
+            [embeddingStr, factId]
+          );
+        } catch (embErr) {
+          console.warn(`[MemoryService] Embedding update failed for ${fact.key}`);
         }
+        
+        savedIds.push(factId);
+        fact.id = factId;
+      } catch (e) {
+        console.error(`[MemoryService] Failed to save session fact ${fact.key}:`, e);
       }
-    } catch (e) {
-      console.error('[MemoryService] Failed to save session facts:', e);
     }
+    
     return savedIds;
   }
 
@@ -723,22 +735,35 @@ Respond with ONLY valid JSON (no markdown):
     sessionId: string,
     facts: MemoryFact[]
   ): Promise<void> {
-    try {
-      for (const fact of facts) {
-        const embedding = await getEmbedding(`${fact.key}: ${fact.value}`);
+    for (const fact of facts) {
+      const factId = crypto.randomUUID();
+      
+      try {
+        const importance = fact.importance || 0.5;
         
-        await db.insert(userMemory).values({
-          userId,
-          factType: fact.type,
-          key: fact.key,
-          value: fact.value,
-          importance: fact.importance || 0.5,
-          embedding,
-          sourceSessionId: sessionId
-        });
+        // Insert fact (pgPool handles proper async/await)
+        await pgPool.query(
+          `INSERT INTO user_memory (id, user_id, fact_type, key, value, importance, source_session_id)
+           VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7::uuid)`,
+          [factId, userId, fact.type || 'preference', fact.key, fact.value, importance, sessionId]
+        );
+        
+        // Generate and update embedding
+        try {
+          const embedding = await getEmbedding(`${fact.key}: ${fact.value}`);
+          const embeddingStr = `[${embedding.join(',')}]`;
+          await pgPool.query(
+            `UPDATE user_memory SET embedding = $1::vector WHERE id = $2::uuid`,
+            [embeddingStr, factId]
+          );
+        } catch (embErr) {
+          console.warn(`[MemoryService] User fact embedding update failed for ${fact.key}`);
+        }
+        
+        fact.id = factId;
+      } catch (e) {
+        console.error(`[MemoryService] Failed to save user fact ${fact.key}:`, e);
       }
-    } catch (e) {
-      console.error('[MemoryService] Failed to save user facts:', e);
     }
   }
 
