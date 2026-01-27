@@ -52,7 +52,7 @@ AgentKit is a production-ready multi-agent chat platform that enables intelligen
 - **Task Agent Framework** for orchestrating human-in-loop and autonomous agent actions
 - **27 Reusable UI Components** built on Radix UI with Tailwind CSS
 - **45+ REST API Endpoints** for full programmatic control
-- **Full Observability** with 37 event types streamed in real-time
+- **Full Observability** with 38 event types streamed in real-time
 
 ---
 
@@ -251,7 +251,7 @@ Comprehensive observability dashboard for monitoring your AI assistant's perform
 
 ## Event Bus & Full Observability
 
-Every action in the system emits events for complete traceability. **37 event types** covering:
+Every action in the system emits events for complete traceability. **38 event types** covering:
 
 | Category | Events |
 |----------|--------|
@@ -502,7 +502,7 @@ agentkit/
 │   │   ├── agents/             # Task Agent Framework
 │   │   ├── chat/               # Chat orchestration + Event Bus
 │   │   ├── llm/                # LLM provider abstraction
-│   │   ├── memory/             # 3-tier memory system
+│   │   ├── memory/             # 4-tier memory system
 │   │   ├── retrieval/          # Domain retrieval
 │   │   ├── graph/              # GraphRAG-lite
 │   │   └── etl/                # ETL pipeline system
