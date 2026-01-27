@@ -45,7 +45,7 @@ AgentKit is a production-ready multi-agent chat platform that enables intelligen
 - **Complete Chat Interface** with voice input, file attachments, image generation, and real-time trace panel
 - **28 Pre-configured Domain Agents** covering all business functions
 - **4 Chat Modes** (Quick, Think, Deep, Research) with configurable pipelines
-- **3-Tier Memory System** for personalized, context-aware conversations
+- **4-Tier Memory System** for personalized, context-aware conversations with knowledge graph linking
 - **GraphRAG-lite** for relationship discovery across your data
 - **Multi-provider LLM Support** (OpenAI, Anthropic, Ollama)
 - **Self-learning ETL Pipelines** with Plan-Act-Reflect pattern
@@ -417,7 +417,7 @@ flowchart TB
     
     subgraph Core[Core Services]
         ModeClassifier[Mode Classifier]
-        MemorySystem[3-Tier Memory]
+        MemorySystem[4-Tier Memory]
         DomainAgents[28 Domain Agents]
         GraphRAG[GraphRAG-lite]
         EventBus[Event Bus]
@@ -463,7 +463,7 @@ sequenceDiagram
     M-->>C: Mode + confidence
     
     C->>Mem: Retrieve memories
-    Note over Mem: Tier 1: Working context<br/>Tier 2: Session memory<br/>Tier 3: Long-term memory
+    Note over Mem: Tier 1: Working context<br/>Tier 2: Session memory<br/>Tier 3: Long-term memory<br/>Tier 4: Context Graph
     Mem-->>C: Relevant context
     
     C->>E: Extract entities
@@ -567,7 +567,7 @@ Each mode has configurable parameters that can be customized per-user:
 
 ## Memory System
 
-AgentKit implements a MemGPT-inspired 3-tier memory system for personalized, context-aware conversations.
+AgentKit implements a MemGPT-inspired **4-tier memory system** for personalized, context-aware conversations with knowledge graph integration.
 
 ### Memory Tiers
 
@@ -576,6 +576,26 @@ AgentKit implements a MemGPT-inspired 3-tier memory system for personalized, con
 | **Tier 1** | Working Context | Recent conversation turns (last 3 exchanges), session summary |
 | **Tier 2** | Session Memory | Relevant past turns from current session, extracted session facts |
 | **Tier 3** | Long-term Memory | User profile facts across all sessions, saved memories |
+| **Tier 4** | Context Graph | Links user context to domain knowledge graph entities |
+
+### Context Graph (Tier 4)
+
+The Context Graph bridges user conversations with your domain knowledge graph, enabling powerful queries like "What did I discuss about Customer X?"
+
+**Key Capabilities:**
+- **Auto-linking**: Automatically detects and links mentioned entities to the knowledge graph
+- **Cross-session tracking**: Tracks which entities you've discussed, queried, or analyzed
+- **Collaboration detection**: Identifies when multiple users are working on the same entities
+- **Entity interaction history**: "What have I discussed about [entity]?" queries
+
+**Reference Types:**
+| Type | Description |
+|------|-------------|
+| `discussed` | User discussed this entity in depth |
+| `queried` | User asked about this entity |
+| `mentioned` | Entity was mentioned in passing |
+| `interested_in` | User expressed interest |
+| `analyzed` | Entity was analyzed in detail |
 
 ### Fact Types Extracted
 
