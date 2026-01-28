@@ -5,6 +5,6 @@ export default {
   out: './drizzle',
   dialect: 'postgresql',
   dbCredentials: {
-    url: process.env.DATABASE_URL || 'postgres://agentkit:agentkit@localhost:5433/agentkit',
+    url: process.env.DATABASE_URL || 'postgres://semanticstudio:semanticstudio@localhost:5433/semanticstudio',
   },
 } satisfies Config;

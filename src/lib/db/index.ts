@@ -2,7 +2,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema';
 
-const connectionString = process.env.DATABASE_URL || 'postgres://agentkit:agentkit@localhost:5433/agentkit';
+const connectionString = process.env.DATABASE_URL || 'postgres://semanticstudio:semanticstudio@localhost:5433/semanticstudio';
 
 // Main pool for drizzle ORM operations
 const pool = new Pool({
