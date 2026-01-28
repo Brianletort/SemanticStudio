@@ -453,8 +453,8 @@ export default function ObservabilityPage() {
                   </CardHeader>
                   <CardContent>
                     {modeChartData.length > 0 ? (
-                      <div className="h-[250px]">
-                        <ResponsiveContainer width="100%" height="100%">
+                      <div className="h-[250px] w-full">
+                        <ResponsiveContainer width="100%" height={250} minHeight={250}>
                           <PieChart>
                             <Pie
                               data={modeChartData}
@@ -501,8 +501,8 @@ export default function ObservabilityPage() {
                   </CardHeader>
                   <CardContent>
                     {webVsLocalData.length > 0 ? (
-                      <div className="h-[250px]">
-                        <ResponsiveContainer width="100%" height="100%">
+                      <div className="h-[250px] w-full">
+                        <ResponsiveContainer width="100%" height={250} minHeight={250}>
                           <PieChart>
                             <Pie
                               data={webVsLocalData}
@@ -552,8 +552,8 @@ export default function ObservabilityPage() {
                 </CardHeader>
                 <CardContent>
                   {analytics?.domainAgentUsage && analytics.domainAgentUsage.length > 0 ? (
-                    <div className="h-[300px]">
-                      <ResponsiveContainer width="100%" height="100%">
+                    <div className="h-[300px] w-full">
+                      <ResponsiveContainer width="100%" height={300} minHeight={300}>
                         <BarChart
                           data={analytics.domainAgentUsage.slice(0, 10)}
                           layout="vertical"
@@ -694,8 +694,8 @@ export default function ObservabilityPage() {
                 </CardHeader>
                 <CardContent>
                   {analytics?.responseTimeDistribution && analytics.responseTimeDistribution.some(d => d.count > 0) ? (
-                    <div className="h-[250px]">
-                      <ResponsiveContainer width="100%" height="100%">
+                    <div className="h-[250px] w-full">
+                      <ResponsiveContainer width="100%" height={250} minHeight={250}>
                         <BarChart data={analytics.responseTimeDistribution}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="bucket" tick={{ fontSize: 12 }} />
@@ -721,8 +721,8 @@ export default function ObservabilityPage() {
                 </CardHeader>
                 <CardContent>
                   {analytics?.messagesPerDay && analytics.messagesPerDay.length > 0 ? (
-                    <div className="h-[300px]">
-                      <ResponsiveContainer width="100%" height="100%">
+                    <div className="h-[300px] w-full">
+                      <ResponsiveContainer width="100%" height={300} minHeight={300}>
                         <AreaChart data={analytics.messagesPerDay}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis
@@ -776,8 +776,8 @@ export default function ObservabilityPage() {
                   </CardHeader>
                   <CardContent>
                     {qualityRadarData.length > 0 && qualityRadarData.some(d => d.value > 0) ? (
-                      <div className="h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%">
+                      <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height={300} minHeight={300}>
                           <RadarChart data={qualityRadarData}>
                             <PolarGrid />
                             <PolarAngleAxis dataKey="subject" tick={{ fontSize: 12 }} />
@@ -848,8 +848,8 @@ export default function ObservabilityPage() {
                 </CardHeader>
                 <CardContent>
                   {analytics?.qualityTrend && analytics.qualityTrend.length > 0 ? (
-                    <div className="h-[350px]">
-                      <ResponsiveContainer width="100%" height="100%">
+                    <div className="h-[350px] w-full">
+                      <ResponsiveContainer width="100%" height={350} minHeight={350}>
                         <AreaChart data={analytics.qualityTrend}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis
