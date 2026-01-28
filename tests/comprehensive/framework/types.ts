@@ -15,7 +15,7 @@ export interface TestStep {
 
 // Assertion definition
 export interface TestAssertion {
-  type: 'response_contains' | 'response_not_contains' | 'mode_is' | 'has_evaluation' | 'evaluation_score_above' | 'memory_contains' | 'session_exists' | 'event_occurred' | 'response_time_under' | 'custom';
+  type: 'response_contains' | 'response_not_contains' | 'mode_is' | 'has_evaluation' | 'evaluation_score_above' | 'memory_contains' | 'session_exists' | 'event_occurred' | 'event_has_field' | 'response_time_under' | 'custom';
   params: Record<string, unknown>;
   message?: string;
 }
@@ -25,6 +25,7 @@ export interface TestScenario {
   id: string;
   name: string;
   description?: string;
+  timeout?: number;
   category: 'modes' | 'memory' | 'files' | 'images' | 'sessions' | 'integration' | 'edge_case';
   tags?: string[];
   steps: TestStep[];

@@ -79,7 +79,7 @@ export async function GET(
         );
 
         // Get latest evaluation for this session
-        const [evaluation] = await safeQuery(
+        const evaluationResults = await safeQuery(
           () => db
             .select({
               qualityScore: chatEvaluations.qualityScore,
@@ -94,11 +94,12 @@ export async function GET(
             .where(eq(chatEvaluations.sessionId, session.id))
             .orderBy(desc(chatEvaluations.createdAt))
             .limit(1),
-          [null]
+          []
         );
+        const evaluation = evaluationResults[0] ?? null;
 
         // Get mode used for this session
-        const [modeEvent] = await safeQuery(
+        const modeEventResults = await safeQuery(
           () => db
             .select({
               mode: sql<string>`${chatAgentEvents.payloadJson}->>'mode'`,
@@ -112,11 +113,12 @@ export async function GET(
             )
             .orderBy(desc(chatAgentEvents.createdAt))
             .limit(1),
-          [null]
+          []
         );
+        const modeEvent = modeEventResults[0] ?? null;
 
         // Check if web search was used
-        const [webSearchEvent] = await safeQuery(
+        const webSearchResults = await safeQuery(
           () => db
             .select({ count: sql<number>`1` })
             .from(chatAgentEvents)
@@ -127,8 +129,9 @@ export async function GET(
               )
             )
             .limit(1),
-          [null]
+          []
         );
+        const webSearchEvent = webSearchResults[0] ?? null;
 
         // Get domain agents used
         const domainAgents = await safeQuery(

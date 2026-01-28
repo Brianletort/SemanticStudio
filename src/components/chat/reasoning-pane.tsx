@@ -485,7 +485,7 @@ export function ReasoningPane({
           text: fallbackText,
           timestamp: event.timestamp || Date.now(),
           type: 'progress',
-          agent: event.agentId || 'system',
+          agent: (event as { agentId?: string }).agentId || 'system',
           tags: [event.type],
           category,
           icon,

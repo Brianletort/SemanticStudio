@@ -57,7 +57,7 @@ export interface CompressedContext {
  * Compression Service
  */
 export class CompressionService {
-  private llmRole = 'memory_extractor'; // Use the lightweight model
+  private llmRole: 'memory_extractor' = 'memory_extractor'; // Use the lightweight model
 
   /**
    * Get context with automatic compression based on budget

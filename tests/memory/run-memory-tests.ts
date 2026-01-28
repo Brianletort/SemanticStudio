@@ -172,7 +172,7 @@ function generateMarkdownReport(report: TestReport): string {
   if (report.issuesFound.filter(i => !report.issuesFixed.find(f => f.id === i.id)).length > 0) {
     md += `## Outstanding Issues\n\n`;
     for (const issue of report.issuesFound) {
-      if (!report.issuesFixed.find(f => f.id === i.id)) {
+      if (!report.issuesFixed.find(f => f.id === issue.id)) {
         md += `- **${issue.id}** [${issue.severity}]: ${issue.description}\n`;
       }
     }

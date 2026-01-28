@@ -14,7 +14,9 @@ import type {
   PARAction,
   PARReflection,
   ETLError,
+  TargetConfig,
 } from '../types';
+import { isMultiTargetConfig } from '../types';
 
 interface JSONPerception {
   rawData: string;
@@ -143,6 +145,12 @@ export class JSONImportAgent extends BaseETLAgent {
     flattenedData.forEach(row => Object.keys(row).forEach(k => fieldsSet.add(k)));
     const fields = Array.from(fieldsSet);
 
+    // JSON import requires single target config
+    const targetConfig = this.jobDefinition.targetConfig;
+    if (isMultiTargetConfig(targetConfig)) {
+      throw new Error('JSON import does not support multi-target configuration');
+    }
+
     return {
       data: {
         rawData,
@@ -154,8 +162,8 @@ export class JSONImportAgent extends BaseETLAgent {
         nestedPaths,
       },
       context: {
-        targetTable: this.jobDefinition.targetConfig.table,
-        mode: this.jobDefinition.targetConfig.mode,
+        targetTable: targetConfig.table,
+        mode: targetConfig.mode,
       },
       iteration: 0,
     };
@@ -171,7 +179,10 @@ export class JSONImportAgent extends BaseETLAgent {
     let recordsFailed = 0;
 
     const { parsedData, fields } = perception.data as JSONPerception;
-    const { targetConfig } = this.jobDefinition;
+    const targetConfig = this.jobDefinition.targetConfig;
+    if (isMultiTargetConfig(targetConfig)) {
+      throw new Error('JSON import does not support multi-target configuration');
+    }
     const tableName = targetConfig.table;
 
     try {

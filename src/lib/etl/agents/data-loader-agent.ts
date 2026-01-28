@@ -26,8 +26,8 @@ import type {
   ETLError,
   MultiTargetConfig,
   StorageTargetConfig,
-  isMultiTargetConfig,
 } from '../types';
+import { isMultiTargetConfig } from '../types';
 
 // Perception data structure
 interface DataLoaderPerception {

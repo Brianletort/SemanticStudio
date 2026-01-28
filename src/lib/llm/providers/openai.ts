@@ -461,7 +461,7 @@ export class OpenAIProvider implements LLMProvider {
         background: background,
         partial_images: partialImages,
         stream: true,
-      } as any);
+      } as any) as unknown as AsyncIterable<unknown>;
 
       let partialCount = 0;
       

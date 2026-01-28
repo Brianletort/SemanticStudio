@@ -34,6 +34,7 @@ import {
   type MemoryTierConfig,
   type PipelineConfig,
   type ConversationMessage,
+  type DistributiveOmit,
 } from "@/lib/chat";
 import { v4 as uuidv4 } from "uuid";
 import { isValidUUID } from "@/lib/utils";
@@ -236,7 +237,7 @@ export async function POST(request: NextRequest) {
 
     // Helper to emit events (always emits for DB persistence)
     // Includes sessionId and turnId for historical trace retrieval
-    const emitEvent = async (event: Omit<AgentEvent, 'runId' | 'sessionId' | 'turnId'>) => {
+    const emitEvent = async (event: DistributiveOmit<AgentEvent, 'runId' | 'sessionId' | 'turnId'>) => {
       await eventBus.emit({ ...event, runId, turnId, sessionId: sessionId || undefined } as AgentEvent);
     };
 
@@ -486,7 +487,7 @@ export async function POST(request: NextRequest) {
         if (webResults.length === 0) {
           await emitEvent({
             type: 'log',
-            level: 'warning',
+            level: 'warn',
             agentId: 'web_search',
             message: `Web search returned 0 results for query: "${effectiveSearchQuery.substring(0, 100)}"`,
           });
@@ -735,12 +736,14 @@ Include citations and sources for all findings.`,
                 const status = await getDeepResearchStatus(researchJob.id);
                 
                 // Emit progress event
+                // Map cancelled status to failed for event compatibility
+                const mappedStatus = status.status === 'cancelled' ? 'failed' : status.status;
                 const progressEvent: AgentEvent = {
                   runId,
                   sessionId: sessionId || undefined,
                   type: 'research_progress',
                   jobId: researchJob.id,
-                  status: status.status,
+                  status: mappedStatus as 'queued' | 'in_progress' | 'completed' | 'failed',
                   message: `Researching... (${Math.round((Date.now() - researchStartTime) / 1000)}s)`,
                   searchesCompleted: status.searchesCompleted,
                   sourcesFound: status.sourcesFound,

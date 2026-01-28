@@ -306,7 +306,7 @@ class EdgeCaseGenerator {
         ],
         assertions: [
           { type: 'has_evaluation', params: {} },
-          { type: 'qualityAbove', params: { threshold: 0.6 } },
+          { type: 'evaluation_score_above', params: { threshold: 0.6 } },
         ],
       });
     }

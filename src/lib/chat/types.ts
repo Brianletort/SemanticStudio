@@ -2,6 +2,9 @@
  * Chat system types for auto mode, events, and evaluation
  */
 
+// Distributive Omit helper - properly distributes over union types
+export type DistributiveOmit<T, K extends keyof T> = T extends T ? Omit<T, K> : never;
+
 // Chat modes
 export type ChatMode = 'auto' | 'quick' | 'think' | 'deep' | 'research';
 

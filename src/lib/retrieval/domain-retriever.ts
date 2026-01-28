@@ -20,7 +20,7 @@ import { expandQueryWithGraph, getSourceDataForNodes } from '@/lib/graph/graphra
 import type { SemanticEntity, ResolvedEntity } from '@/lib/semantic/types';
 import type { GraphExpansionResult } from '@/lib/graph/types';
 import type { AgentEventBus } from '@/lib/chat/event-bus';
-import type { AgentEvent } from '@/lib/chat/types';
+import type { AgentEvent, DistributiveOmit } from '@/lib/chat/types';
 
 export type RetrievalMode = 'quick' | 'think' | 'deep' | 'research';
 
@@ -96,7 +96,7 @@ export class DomainRetriever {
     };
     
     // Helper to emit events
-    const emitEvent = async (event: Omit<AgentEvent, 'runId'>) => {
+    const emitEvent = async (event: DistributiveOmit<AgentEvent, 'runId'>) => {
       if (eventBus) {
         await eventBus.emit({ ...event, runId } as AgentEvent);
       }
@@ -128,7 +128,7 @@ export class DomainRetriever {
         type: 'graph_traversal_complete',
         hops: config.graphHops,
         nodesVisited: graphContext?.expandedNodes?.length || 0,
-        relationshipsFound: graphContext?.relationships?.length || 0,
+        relationshipsFound: graphContext?.paths?.length || 0,
         durationMs: Date.now() - graphStartTime,
       });
     }
@@ -173,7 +173,7 @@ export class DomainRetriever {
     entities: ResolvedEntity[],
     agentName: string | undefined,
     maxResults: number,
-    emitEvent: (event: Omit<AgentEvent, 'runId'>) => Promise<void>
+    emitEvent: (event: DistributiveOmit<AgentEvent, 'runId'>) => Promise<void>
   ): Promise<DataQueryResult[]> {
     const results: DataQueryResult[] = [];
     const queriedTables = new Set<string>();

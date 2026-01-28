@@ -15,7 +15,9 @@ import type {
   PARAction,
   PARReflection,
   ETLError,
+  TargetConfig,
 } from '../types';
+import { isMultiTargetConfig } from '../types';
 
 interface CSVPerception {
   rawData: string;
@@ -125,6 +127,12 @@ export class CSVImportAgent extends BaseETLAgent {
     const headers = parseResult.meta.fields || [];
     const detectedTypes = this.detectColumnTypes(data);
 
+    // CSV import requires single target config
+    const targetConfig = this.jobDefinition.targetConfig;
+    if (isMultiTargetConfig(targetConfig)) {
+      throw new Error('CSV import does not support multi-target configuration');
+    }
+
     return {
       data: {
         rawData: this.fileContent,
@@ -135,8 +143,8 @@ export class CSVImportAgent extends BaseETLAgent {
         detectedTypes,
       },
       context: {
-        targetTable: this.jobDefinition.targetConfig.table,
-        mode: this.jobDefinition.targetConfig.mode,
+        targetTable: targetConfig.table,
+        mode: targetConfig.mode,
       },
       iteration: 0,
     };
@@ -152,7 +160,10 @@ export class CSVImportAgent extends BaseETLAgent {
     let recordsFailed = 0;
 
     const { parsedData, headers, detectedTypes } = perception.data as CSVPerception;
-    const { targetConfig } = this.jobDefinition;
+    const targetConfig = this.jobDefinition.targetConfig;
+    if (isMultiTargetConfig(targetConfig)) {
+      throw new Error('CSV import does not support multi-target configuration');
+    }
     const tableName = targetConfig.table;
 
     try {

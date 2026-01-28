@@ -29,7 +29,8 @@ export const allToolDefinitions: ToolDefinition[] = [
 ];
 
 // Get tools for an agent based on their configuration
-export async function getToolsForAgent(agentId: string): Promise<Tool[]> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getToolsForAgent(agentId: string): Promise<Tool<any, any>[]> {
   // For now, return all tools
   // In the future, this could be filtered based on agent configuration
   return Object.values(allTools);

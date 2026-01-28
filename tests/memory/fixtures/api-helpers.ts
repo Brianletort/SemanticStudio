@@ -97,8 +97,8 @@ function extractContent(events: ChatEvent[]): string {
       contentParts.push(event.content);
     }
     // Also check for streaming content chunks
-    if (event.type === 'text_delta' && (event as Record<string, unknown>).text) {
-      contentParts.push((event as Record<string, unknown>).text as string);
+    if (event.type === 'text_delta' && (event as unknown as Record<string, unknown>).text) {
+      contentParts.push((event as unknown as Record<string, unknown>).text as string);
     }
   }
 
