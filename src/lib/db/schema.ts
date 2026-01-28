@@ -113,7 +113,7 @@ export const userSettings = pgTable('user_settings', {
   memoryEnabled: boolean('memory_enabled').default(true),
   referenceSavedMemories: boolean('reference_saved_memories').default(true),
   referenceChatHistory: boolean('reference_chat_history').default(true),
-  autoSaveMemories: boolean('auto_save_memories').default(false),
+  autoSaveMemories: boolean('auto_save_memories').default(true),
   memoryExtractionMode: text('memory_extraction_mode').default('balanced'),
   maxMemoriesInContext: integer('max_memories_in_context').default(10),
   includeSessionSummaries: boolean('include_session_summaries').default(false),
@@ -795,6 +795,29 @@ export const chatEvaluations = pgTable('chat_evaluations', {
   sessionIdIdx: index('idx_chat_evaluations_session_id').on(table.sessionId),
 }));
 
+// ============================================
+// PROMPT LIBRARY
+// ============================================
+
+// Prompt Library - user and system prompts/templates
+export const promptLibrary = pgTable('prompt_library', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  content: text('content').notNull(),
+  category: text('category').default('general'),
+  isSystem: boolean('is_system').default(false),
+  isEdited: boolean('is_edited').default(false),  // Track if user edited a system prompt copy
+  systemPromptId: uuid('system_prompt_id'),  // Reference to original system prompt if this is an edited copy
+  displayOrder: integer('display_order').default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  userIdIdx: index('idx_prompt_library_user_id').on(table.userId),
+  categoryIdx: index('idx_prompt_library_category').on(table.category),
+  isSystemIdx: index('idx_prompt_library_is_system').on(table.isSystem),
+}));
+
 // Types
 export type User = typeof users.$inferSelect;
 export type SessionFolder = typeof sessionFolders.$inferSelect;
@@ -840,3 +863,4 @@ export type ChatEvaluation = typeof chatEvaluations.$inferSelect;
 export type EconomicIndicator = typeof economicIndicators.$inferSelect;
 export type PublicCompany = typeof publicCompanies.$inferSelect;
 export type IndustryStatistic = typeof industryStatistics.$inferSelect;
+export type PromptLibraryItem = typeof promptLibrary.$inferSelect;

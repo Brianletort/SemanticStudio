@@ -44,7 +44,7 @@ SemanticStudio is a production-ready multi-agent chat platform that enables inte
 
 - **Complete Chat Interface** with voice input, file attachments, image generation, and real-time trace panel
 - **28 Pre-configured Domain Agents** covering all business functions
-- **4 Chat Modes** (Quick, Think, Deep, Research) with configurable pipelines
+- **5 Chat Modes** (Auto, Quick, Think, Deep, Research) with configurable pipelines
 - **4-Tier Memory System** for personalized, context-aware conversations with knowledge graph linking
 - **GraphRAG-lite** for relationship discovery across your data
 - **Multi-provider LLM Support** (OpenAI, Anthropic, Ollama)
@@ -76,10 +76,29 @@ A modern, responsive chat interface with everything you need for enterprise AI c
 | **Session Management** | Folders, search, pin, and archive conversations |
 | **Real-time Trace Panel** | See every step of agent reasoning as it happens |
 | **Quality Scores** | Automatic response evaluation with hallucination detection |
+| **Prompt Library** | Pre-built prompts and parameterized templates for common tasks |
+
+### Prompt Library
+
+Accelerate your workflow with pre-built prompts and intelligent templates.
+
+| Component | Description |
+|-----------|-------------|
+| **Prompt Picker** | Quick-access dropdown to saved prompts for one-click insertion |
+| **Prompt Builder** | Parameterized templates with fill-in-the-blank variables |
+
+**Built-in Templates:**
+- **Compare Items** — Side-by-side analysis of two options with recommendations
+- **Analyze Trends** — Data pattern identification with actionable insights
+- **Explain Concept** — Structured explanations for any audience level
+- **Create Summary** — Condensed overviews of complex topics
+- **Set Goal** — SMART goal formulation with success metrics
+
+Templates support variable substitution (e.g., "Compare `{itemA}` and `{itemB}` for `{useCase}`"). Users can customize system prompts and save their own templates.
 
 ### Intelligent Mode Selection
 
-Four configurable modes with distinct processing pipelines, each optimized for different use cases.
+Five configurable modes with distinct processing pipelines, each optimized for different use cases.
 
 <p align="center">
   <img src="docs/images/chat-modes.png" alt="Chat Modes" width="600">
@@ -87,6 +106,7 @@ Four configurable modes with distinct processing pipelines, each optimized for d
 
 | Mode | Purpose | Depth | Speed |
 |------|---------|-------|-------|
+| **Auto** | Intelligent mode selection based on query complexity | Varies | Adaptive |
 | **Quick** | Simple lookups, quick facts | Surface | Fast |
 | **Think** | Analysis, insights | Moderate | Balanced |
 | **Deep** | Comprehensive research | Deep | Thorough |
@@ -98,6 +118,10 @@ Each mode controls:
 - Which memory tiers are included
 - Whether reflection/self-critique is enabled
 - Which LLM model is used
+
+**Auto Mode:** Uses an LLM classifier to analyze query complexity, intent, and scope, then automatically selects the most appropriate mode. This is the default mode for new users.
+
+**Research Mode Intelligence:** Follow-up questions are automatically detected and rewritten to extend the original research query. This enables ChatGPT-like behavior where "tell me more about X" continues the investigation rather than starting fresh.
 
 **All parameters are configurable via the admin UI without code changes.**
 
@@ -497,6 +521,7 @@ semanticstudio/
 │   │       ├── etl/            # ETL operations
 │   │       ├── graph/          # Knowledge graph APIs
 │   │       ├── memories/       # Memory system APIs
+│   │       ├── prompts/        # Prompt library APIs
 │   │       └── ...
 │   ├── lib/
 │   │   ├── agents/             # Task Agent Framework
@@ -620,6 +645,8 @@ The memory system automatically extracts and categorizes facts from conversation
 
 Configure memory behavior in **Settings → Memory Configuration**.
 
+**Default Behavior:** Memory extraction is enabled by default (`autoSaveMemories: true`). The system automatically extracts and saves facts from conversations without requiring manual configuration. Users can disable this in settings if preferred.
+
 ---
 
 ## Task Agent Framework
@@ -723,6 +750,7 @@ PostgreSQL 16 with pgvector extension for vector similarity search. The schema i
 | **ETL System** | `etl_jobs`, `etl_runs`, `etl_learned_knowledge` |
 | **Quality** | `evaluations` |
 | **Configuration** | `model_configs`, `mode_configs`, `user_settings` |
+| **Prompts** | `prompt_library` |
 
 ---
 
@@ -748,6 +776,8 @@ PostgreSQL 16 with pgvector extension for vector similarity search. The schema i
 | `POST` | `/api/images/generate` | Generate image |
 | `GET` | `/api/models` | List model configurations |
 | `PUT` | `/api/models/{role}` | Update model for role |
+| `GET` | `/api/prompts` | List prompt library templates |
+| `POST` | `/api/prompts` | Create custom prompt |
 | ... | ... | [See full API docs](docs/api-reference.md) |
 
 ### Chat Request

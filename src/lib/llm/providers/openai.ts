@@ -244,6 +244,14 @@ export class OpenAIProvider implements LLMProvider {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const response = await (this.client as any).responses.retrieve(responseId);
 
+    // Debug logging for response structure
+    console.log(`[OpenAI] Response status: ${response.status}, output items: ${response.output?.length || 0}`);
+    if (response.output && response.output.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const itemTypes = response.output.map((i: any) => i.type).join(', ');
+      console.log(`[OpenAI] Output item types: ${itemTypes}`);
+    }
+
     // Count web search calls and sources found from output
     let sourcesFound = 0;
     let searchesCompleted = 0;
@@ -258,6 +266,8 @@ export class OpenAIProvider implements LLMProvider {
         }
       }
     }
+    
+    console.log(`[OpenAI] Progress: ${searchesCompleted} searches, ${sourcesFound} sources found`);
 
     return {
       id: response.id,

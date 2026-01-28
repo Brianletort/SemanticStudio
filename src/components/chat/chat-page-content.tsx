@@ -6,6 +6,8 @@ import { ChatMessages, type ChatMessage, type ImageGenerationData } from "@/comp
 import { ChatInput, type FileAttachment, type ImageGenerationSettings } from "@/components/chat/chat-input";
 import { SessionPane, type Session } from "@/components/chat/session-pane";
 import { ReasoningPane } from "@/components/chat/reasoning-pane";
+import { PromptPicker } from "@/components/chat/prompt-picker";
+import { PromptBuilder } from "@/components/chat/prompt-builder";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { 
@@ -42,10 +44,8 @@ export function ChatPageContent({ initialSessionId }: ChatPageContentProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [mode, setMode] = useState<ChatMode>("auto");
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const [imageMode, setImageMode] = useState(false);
-  const [webEnabled, setWebEnabled] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(initialSessionId || null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [sessionPaneOpen, setSessionPaneOpen] = useState(true);
@@ -53,9 +53,6 @@ export function ChatPageContent({ initialSessionId }: ChatPageContentProps) {
   
   // Trace/debug panel state - always visible, can be minimized
   const [traceMinimized, setTraceMinimized] = useState(false);
-  const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
-  const [modeClassification, setModeClassification] = useState<ModeClassification | null>(null);
-  const [currentTurnId, setCurrentTurnId] = useState<string | null>(null);
   const [effectiveMode, setEffectiveMode] = useState<Exclude<ChatMode, 'auto'>>('think');
 
   // Global store for tracking active sessions across navigation
@@ -64,6 +61,27 @@ export function ChatPageContent({ initialSessionId }: ChatPageContentProps) {
   const registerActiveSession = useChatStore((state) => state.registerActiveSession);
   const unregisterActiveSession = useChatStore((state) => state.unregisterActiveSession);
   const setSessionStreaming = useChatStore((state) => state.setSessionStreaming);
+  const setJustCreatedSessionId = useChatStore((state) => state.setJustCreatedSessionId);
+  
+  // Trace state actions from Zustand store - persists across navigation
+  // Using getState() for actions that don't need to trigger re-renders
+  const addSessionAgentEvent = useChatStore((state) => state.addSessionAgentEvent);
+  const setSessionModeClassification = useChatStore((state) => state.setSessionModeClassification);
+  const setSessionTurnId = useChatStore((state) => state.setSessionTurnId);
+  
+  // Subscribe to trace state for the current session
+  const sessionTraceState = useChatStore((state) => 
+    sessionId ? state.sessionTraceState.get(sessionId) : undefined
+  );
+  const agentEvents = sessionTraceState?.agentEvents ?? [];
+  const modeClassification = sessionTraceState?.modeClassification ?? null;
+  const currentTurnId = sessionTraceState?.currentTurnId ?? null;
+  
+  // Session preferences from Zustand store - persist across messages and navigation
+  const webEnabled = useChatStore((state) => state.webEnabled);
+  const setWebEnabled = useChatStore((state) => state.setWebEnabled);
+  const mode = useChatStore((state) => state.mode);
+  const setMode = useChatStore((state) => state.setMode);
 
   // Load sessions on mount
   useEffect(() => {
@@ -150,17 +168,25 @@ export function ChatPageContent({ initialSessionId }: ChatPageContentProps) {
   // Load messages when initialSessionId changes
   // Also reset trace/agent state to ensure clean state without remounting
   useEffect(() => {
+    // Check if we're navigating to the session that was just created
+    // (which happens after streaming completes for new chats)
+    // Use the global store (not a ref) because it persists across page navigations
+    const justCreatedId = useChatStore.getState().justCreatedSessionId;
+    const isNavigatingToJustCreatedSession = justCreatedId && initialSessionId === justCreatedId;
+    
     if (initialSessionId) {
       setSessionId(initialSessionId);
       loadSessionMessages(initialSessionId);
+      
+      // Only clear trace state when navigating to a DIFFERENT session
+      // Don't clear when navigating to the session that was just created
+      if (!isNavigatingToJustCreatedSession) {
+        useChatStore.getState().clearSessionTraceState(initialSessionId);
+      }
     } else {
       setSessionId(null);
       setMessages([]);
     }
-    // Reset trace state when session changes (replaces key-based remount)
-    setAgentEvents([]);
-    setModeClassification(null);
-    setCurrentTurnId(null);
   }, [initialSessionId, loadSessionMessages]);
 
   // Restore and sync loading state when navigating to an active session
@@ -269,6 +295,9 @@ export function ChatPageContent({ initialSessionId }: ChatPageContentProps) {
   const handleSubmit = useCallback(async (message: string, imageSettings?: ImageGenerationSettings) => {
     if (!message.trim()) return;
 
+    // Clear any previous justCreatedSessionId since we're starting a new interaction
+    setJustCreatedSessionId(null);
+    
     // Create session lazily on first message
     let currentSessionId = sessionId;
     let shouldNavigateAfterStreaming = false;
@@ -281,6 +310,9 @@ export function ChatPageContent({ initialSessionId }: ChatPageContentProps) {
       }
       currentSessionId = newId;
       setSessionId(newId);
+      // Store in global state so we know this session was created locally
+      // This persists across page navigation unlike refs
+      setJustCreatedSessionId(newId);
       // Don't navigate yet - it causes remount and breaks streaming
       // We'll navigate after streaming completes
       shouldNavigateAfterStreaming = true;
@@ -465,10 +497,10 @@ export function ChatPageContent({ initialSessionId }: ChatPageContentProps) {
         // Note: Assistant message was already saved at the start of image generation
         // to ensure proper messageId linkage with the generated image
       } else {
-        // Clear previous trace data
-        setAgentEvents([]);
-        setModeClassification(null);
-        setCurrentTurnId(null);
+        // Clear previous trace data for this session
+        if (currentSessionId) {
+          useChatStore.getState().clearSessionTraceState(currentSessionId);
+        }
         
         // Regular chat flow - include full attachment data with extracted content
         const response = await fetch("/api/chat", {
@@ -559,18 +591,22 @@ export function ChatPageContent({ initialSessionId }: ChatPageContentProps) {
                     );
                   } else if (parsed.type === 'mode') {
                     // Mode classification result
-                    setModeClassification(parsed.classification);
+                    if (currentSessionId) {
+                      setSessionModeClassification(currentSessionId, parsed.classification);
+                    }
                     setEffectiveMode(parsed.classification.recommendedMode);
-                    if (parsed.turnId) {
-                      setCurrentTurnId(parsed.turnId);
+                    if (parsed.turnId && currentSessionId) {
+                      setSessionTurnId(currentSessionId, parsed.turnId);
                     }
                   } else if (parsed.type === 'agent') {
                     // Agent event for trace
-                    setAgentEvents((prev) => [...prev, parsed.event]);
+                    if (currentSessionId) {
+                      addSessionAgentEvent(currentSessionId, parsed.event);
+                    }
                   } else if (parsed.type === 'evaluation') {
                     // Evaluation ready - store turnId for display
-                    if (parsed.turnId) {
-                      setCurrentTurnId(parsed.turnId);
+                    if (parsed.turnId && currentSessionId) {
+                      setSessionTurnId(currentSessionId, parsed.turnId);
                       // Capture for persistence
                       messageTurnId = parsed.turnId;
                       messageEffectiveMode = effectiveMode;
@@ -804,11 +840,23 @@ export function ChatPageContent({ initialSessionId }: ChatPageContentProps) {
         <ChatMessages messages={messages} isLoading={isLoading} />
 
         {/* Input Area */}
-        <div className="border-t p-4">
+        <div className="border-t p-4 relative z-10">
           <div className="max-w-3xl mx-auto space-y-3">
             {/* Mode and Web Controls - above input */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
+                {/* Prompt Library - simple prompts */}
+                <PromptPicker
+                  onSelectPrompt={(content) => setInputValue(content)}
+                  disabled={isLoading}
+                />
+
+                {/* Prompt Builder - parameterized templates */}
+                <PromptBuilder
+                  onInsertPrompt={(content) => setInputValue(content)}
+                  disabled={isLoading}
+                />
+
                 {/* Web search toggle */}
                 <div className="flex items-center gap-1.5">
                   <Globe className="h-4 w-4 text-muted-foreground" />
@@ -867,7 +915,7 @@ export function ChatPageContent({ initialSessionId }: ChatPageContentProps) {
       </div>
 
       {/* Reasoning/Trace Pane - Always visible */}
-      <div className={`${traceMinimized ? 'w-16' : 'w-80'} flex-shrink-0 transition-all duration-200`}>
+      <div className={`${traceMinimized ? 'w-16' : 'w-80'} flex-shrink-0 transition-all duration-200 overflow-hidden relative z-0`}>
         <ReasoningPane
           isVisible={true}
           isProcessing={isLoading}

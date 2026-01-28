@@ -433,6 +433,35 @@ export function ReasoningPane({
         // Already handled above with modeClassification prop
       }
       
+      // Reflection events
+      else if (event.type === 'reflection_started') {
+        newLines.push({
+          id: `line-${index}-reflect-start`,
+          text: 'Reflecting on response quality...',
+          timestamp: event.timestamp || Date.now(),
+          type: 'thinking',
+          agent: 'reflection',
+          tags: ['reflection'],
+          category: 'evaluation',
+          icon,
+        });
+      }
+      
+      else if (event.type === 'reflection_complete') {
+        newLines.push({
+          id: `line-${index}-reflect-complete`,
+          text: (event as { refinementApplied?: boolean; durationMs?: number }).refinementApplied 
+            ? `Refined response (${(event as { durationMs?: number }).durationMs}ms)` 
+            : `Response verified (${(event as { durationMs?: number }).durationMs}ms)`,
+          timestamp: event.timestamp || Date.now(),
+          type: 'result',
+          agent: 'reflection',
+          tags: ['reflection', 'complete'],
+          category: 'evaluation',
+          icon,
+        });
+      }
+      
       else if (event.type === 'log') {
         newLines.push({
           id: `line-${index}-log`,
@@ -442,6 +471,23 @@ export function ReasoningPane({
           agent: event.agentId,
           tags: ['log', event.level],
           category: 'general',
+          icon,
+        });
+      }
+      
+      // Fallback handler for unhandled event types
+      else {
+        const fallbackText = (event as { message?: string; label?: string }).message 
+          || (event as { message?: string; label?: string }).label 
+          || `Event: ${event.type}`;
+        newLines.push({
+          id: `line-${index}-unknown`,
+          text: fallbackText,
+          timestamp: event.timestamp || Date.now(),
+          type: 'progress',
+          agent: event.agentId || 'system',
+          tags: [event.type],
+          category,
           icon,
         });
       }

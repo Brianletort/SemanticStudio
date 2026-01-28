@@ -80,3 +80,11 @@ export {
   type ClarificationQuestion,
   type ClarificationResult,
 } from './clarification-agent';
+
+// Research follow-up agent
+export {
+  ResearchFollowUpAgent,
+  createResearchFollowUpAgent,
+  type FollowUpAnalysis,
+  type ConversationMessage,
+} from './research-followup-agent';

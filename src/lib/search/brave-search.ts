@@ -28,9 +28,10 @@ export interface BraveSearchResponse {
 
 /**
  * Check if Brave Search is configured
+ * Note: Uses PRO keys for web search (AI_GROUNDING key doesn't return web results)
  */
 export function isBraveSearchConfigured(): boolean {
-  return !!(process.env.BRAVE_API_KEY_AI_GROUNDING || process.env.BRAVE_API_KEY);
+  return !!(process.env.BRAVE_API_KEY_PRO || process.env.BRAVE_API_KEY_PRO_AI || process.env.BRAVE_API_KEY);
 }
 
 /**
@@ -40,19 +41,41 @@ export async function braveSearch(
   query: string, 
   count: number = 5
 ): Promise<BraveSearchResult[]> {
-  const apiKey = process.env.BRAVE_API_KEY_AI_GROUNDING || process.env.BRAVE_API_KEY;
+  // Use PRO keys for web search (AI_GROUNDING key doesn't return web results)
+  const apiKey = process.env.BRAVE_API_KEY_PRO || process.env.BRAVE_API_KEY_PRO_AI || process.env.BRAVE_API_KEY;
   
   if (!apiKey) {
     console.warn('[BraveSearch] No API key configured');
-    return [];
+    throw new Error('Brave Search API key not configured');
   }
+
+  // Truncate query to meet Brave API limits (400 chars or 50 words)
+  const MAX_QUERY_LENGTH = 400;
+  const MAX_WORDS = 50;
+
+  let truncatedQuery = query;
+  const words = query.split(/\s+/);
+  if (words.length > MAX_WORDS) {
+    truncatedQuery = words.slice(0, MAX_WORDS).join(' ');
+  }
+  if (truncatedQuery.length > MAX_QUERY_LENGTH) {
+    truncatedQuery = truncatedQuery.substring(0, MAX_QUERY_LENGTH);
+    // Avoid cutting in middle of word
+    const lastSpace = truncatedQuery.lastIndexOf(' ');
+    if (lastSpace > MAX_QUERY_LENGTH - 50) {
+      truncatedQuery = truncatedQuery.substring(0, lastSpace);
+    }
+  }
+
+  const wasQueryTruncated = truncatedQuery !== query;
+  console.log(`[BraveSearch] Searching for: "${truncatedQuery.substring(0, 100)}..." (count: ${count})${wasQueryTruncated ? ` [truncated from ${query.length} to ${truncatedQuery.length} chars]` : ''}`);
 
   try {
     const url = new URL('https://api.search.brave.com/res/v1/web/search');
-    url.searchParams.set('q', query);
+    url.searchParams.set('q', truncatedQuery);
     url.searchParams.set('count', String(count));
     url.searchParams.set('safesearch', 'moderate');
-    url.searchParams.set('freshness', 'py'); // Past year
+    // Removed freshness filter to get more results
 
     const response = await fetch(url.toString(), {
       headers: {
@@ -63,13 +86,17 @@ export async function braveSearch(
     });
 
     if (!response.ok) {
-      console.error('[BraveSearch] API error:', response.status, response.statusText);
-      return [];
+      const errorText = await response.text().catch(() => 'Unable to read error body');
+      console.error('[BraveSearch] API error:', response.status, response.statusText, errorText);
+      throw new Error(`Brave Search API error: ${response.status} ${response.statusText}`);
     }
 
     const data: BraveSearchResponse = await response.json();
     
+    console.log(`[BraveSearch] Response received, web results: ${data.web?.results?.length ?? 0}`);
+    
     if (!data.web?.results) {
+      console.log('[BraveSearch] No web.results in response, full response:', JSON.stringify(data).substring(0, 500));
       return [];
     }
 
@@ -81,7 +108,7 @@ export async function braveSearch(
     }));
   } catch (error) {
     console.error('[BraveSearch] Failed to search:', error);
-    return [];
+    throw error;
   }
 }
 

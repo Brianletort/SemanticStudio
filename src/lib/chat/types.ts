@@ -45,6 +45,7 @@ export type AgentEventType =
   // Research mode specific
   | 'clarification_requested'
   | 'clarification_answered'
+  | 'research_followup_detected'
   | 'research_job_created'
   | 'research_progress'
   | 'research_source_found'
@@ -229,6 +230,14 @@ export interface ClarificationRequestedEvent extends BaseAgentEvent {
 export interface ClarificationAnsweredEvent extends BaseAgentEvent {
   type: 'clarification_answered';
   answersCount: number;
+}
+
+export interface ResearchFollowUpDetectedEvent extends BaseAgentEvent {
+  type: 'research_followup_detected';
+  originalQuery: string;
+  followUpIntent: string;
+  enhancedQuery: string;
+  confidence: number;
 }
 
 export interface ResearchJobCreatedEvent extends BaseAgentEvent {
@@ -447,6 +456,7 @@ export type AgentEvent =
   // Research mode
   | ClarificationRequestedEvent
   | ClarificationAnsweredEvent
+  | ResearchFollowUpDetectedEvent
   | ResearchJobCreatedEvent
   | ResearchProgressEvent
   | ResearchSourceFoundEvent

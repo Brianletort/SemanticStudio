@@ -37,17 +37,14 @@ import {
   Edit,
   Loader2,
   Save,
-  Check,
-  X,
-  Sun,
-  Moon,
-  Monitor,
   FolderKanban,
-  Pin,
   Network,
   Search,
   Clock,
   TrendingUp,
+  Lightbulb,
+  RotateCcw,
+  Pin,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -119,6 +116,21 @@ interface CrossGraphResult {
   totalMentions: number;
 }
 
+interface PromptLibraryItem {
+  id: string;
+  userId: string | null;
+  title: string;
+  content: string;
+  category: string | null;
+  isSystem: boolean | null;
+  isEdited: boolean | null;
+  systemPromptId: string | null;
+  displayOrder: number | null;
+  originalContent?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 const conversationStyles = [
   { value: "professional", label: "Professional", description: "Formal, business-appropriate" },
   { value: "friendly", label: "Friendly", description: "Warm and approachable" },
@@ -188,6 +200,14 @@ export default function SettingsPage() {
   const [searchResults, setSearchResults] = useState<CrossGraphResult[]>([]);
   const [contextLoading, setContextLoading] = useState(false);
   const [contextSearching, setContextSearching] = useState(false);
+
+  // Prompt Library state
+  const [prompts, setPrompts] = useState<PromptLibraryItem[]>([]);
+  const [promptsLoading, setPromptsLoading] = useState(false);
+  const [promptDialogOpen, setPromptDialogOpen] = useState(false);
+  const [editingPrompt, setEditingPrompt] = useState<PromptLibraryItem | null>(null);
+  const [promptTitle, setPromptTitle] = useState("");
+  const [promptContent, setPromptContent] = useState("");
 
   useEffect(() => {
     fetchData();
@@ -297,6 +317,124 @@ export default function SettingsPage() {
       console.error("Failed to clear context:", error);
       toast.error("Failed to clear context");
     }
+  };
+
+  // Prompt Library functions
+  const fetchPrompts = async () => {
+    setPromptsLoading(true);
+    try {
+      const response = await fetch("/api/prompts");
+      if (response.ok) {
+        const data = await response.json();
+        setPrompts(data);
+      } else {
+        console.error("Failed to fetch prompts: HTTP", response.status);
+        toast.error("Failed to load prompts");
+      }
+    } catch (error) {
+      console.error("Failed to fetch prompts:", error);
+      toast.error("Failed to load prompts");
+    } finally {
+      setPromptsLoading(false);
+    }
+  };
+
+  const handleAddPrompt = async () => {
+    if (!promptTitle.trim() || !promptContent.trim()) return;
+
+    try {
+      const response = await fetch("/api/prompts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: promptTitle,
+          content: promptContent,
+        }),
+      });
+
+      if (response.ok) {
+        const prompt = await response.json();
+        setPrompts([...prompts, prompt]);
+        setPromptTitle("");
+        setPromptContent("");
+        setPromptDialogOpen(false);
+        toast.success("Prompt added");
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to add prompt");
+      }
+    } catch (error) {
+      console.error("Failed to add prompt:", error);
+      toast.error("Failed to add prompt");
+    }
+  };
+
+  const handleUpdatePrompt = async () => {
+    if (!editingPrompt || !promptTitle.trim() || !promptContent.trim()) return;
+
+    try {
+      const response = await fetch("/api/prompts", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingPrompt.id,
+          title: promptTitle,
+          content: promptContent,
+        }),
+      });
+
+      if (response.ok) {
+        const updated = await response.json();
+        // If we edited a system prompt, we may have created a new entry, so refresh
+        if (editingPrompt.isSystem && !editingPrompt.userId) {
+          await fetchPrompts();
+        } else {
+          setPrompts(prompts.map((p) => (p.id === updated.id ? updated : p)));
+        }
+        setEditingPrompt(null);
+        setPromptTitle("");
+        setPromptContent("");
+        setPromptDialogOpen(false);
+        toast.success("Prompt updated");
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to update prompt");
+      }
+    } catch (error) {
+      console.error("Failed to update prompt:", error);
+      toast.error("Failed to update prompt");
+    }
+  };
+
+  const handleDeletePrompt = async (promptId: string) => {
+    try {
+      const response = await fetch(`/api/prompts?id=${promptId}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.wasEditedCopy) {
+          // Refresh to get the original system prompt back
+          await fetchPrompts();
+          toast.success("Reset to default");
+        } else {
+          setPrompts(prompts.filter((p) => p.id !== promptId));
+          toast.success("Prompt deleted");
+        }
+      }
+    } catch (error) {
+      console.error("Failed to delete prompt:", error);
+      toast.error("Failed to delete prompt");
+    }
+  };
+
+  const handleResetPrompt = async (prompt: PromptLibraryItem) => {
+    if (!prompt.isEdited || !prompt.systemPromptId) return;
+    
+    if (!confirm("Reset this prompt to its default content?")) return;
+    
+    await handleDeletePrompt(prompt.id);
   };
 
   const handleSaveSettings = async () => {
@@ -460,34 +598,42 @@ export default function SettingsPage() {
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-4xl mx-auto">
           <Tabs defaultValue="profile" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-7">
-              <TabsTrigger value="profile" className="flex items-center gap-2">
+            <TabsList className="flex flex-wrap h-auto gap-1 p-1">
+              <TabsTrigger value="profile" className="flex items-center gap-1.5 px-3">
                 <User className="h-4 w-4" />
                 Profile
               </TabsTrigger>
-              <TabsTrigger value="appearance" className="flex items-center gap-2">
+              <TabsTrigger value="appearance" className="flex items-center gap-1.5 px-3">
                 <Palette className="h-4 w-4" />
                 Appearance
               </TabsTrigger>
-              <TabsTrigger value="personalization" className="flex items-center gap-2">
+              <TabsTrigger value="personalization" className="flex items-center gap-1.5 px-3">
                 <MessageSquare className="h-4 w-4" />
                 Personalization
               </TabsTrigger>
-              <TabsTrigger value="chat" className="flex items-center gap-2">
+              <TabsTrigger value="chat" className="flex items-center gap-1.5 px-3">
                 <FolderKanban className="h-4 w-4" />
                 Chat
               </TabsTrigger>
-              <TabsTrigger value="memory" className="flex items-center gap-2">
+              <TabsTrigger value="memory" className="flex items-center gap-1.5 px-3">
                 <Brain className="h-4 w-4" />
                 Memory
               </TabsTrigger>
-              <TabsTrigger value="memories" className="flex items-center gap-2">
+              <TabsTrigger value="memories" className="flex items-center gap-1.5 px-3">
                 <Edit className="h-4 w-4" />
                 Saved
               </TabsTrigger>
               <TabsTrigger 
+                value="prompts" 
+                className="flex items-center gap-1.5 px-3"
+                onClick={() => fetchPrompts()}
+              >
+                <Lightbulb className="h-4 w-4" />
+                Prompts
+              </TabsTrigger>
+              <TabsTrigger 
                 value="context" 
-                className="flex items-center gap-2"
+                className="flex items-center gap-1.5 px-3"
                 onClick={() => fetchContextGraph()}
               >
                 <Network className="h-4 w-4" />
@@ -950,6 +1096,120 @@ export default function SettingsPage() {
               </Card>
             </TabsContent>
 
+            {/* Prompts Tab */}
+            <TabsContent value="prompts">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Prompt Library</CardTitle>
+                      <CardDescription>
+                        Manage your saved prompts for quick access in the chat.
+                      </CardDescription>
+                    </div>
+                    <Button
+                      onClick={() => {
+                        setEditingPrompt(null);
+                        setPromptTitle("");
+                        setPromptContent("");
+                        setPromptDialogOpen(true);
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Prompt
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {promptsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : prompts.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Lightbulb className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p className="font-medium">No prompts yet</p>
+                      <p className="text-sm mb-4">
+                        Add prompts to quickly start conversations with common questions
+                      </p>
+                      <Button
+                        onClick={() => {
+                          setEditingPrompt(null);
+                          setPromptTitle("");
+                          setPromptContent("");
+                          setPromptDialogOpen(true);
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Your First Prompt
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {prompts.map((prompt) => (
+                        <div
+                          key={prompt.id}
+                          className="flex items-start gap-3 p-3 rounded-lg border bg-background"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-sm">{prompt.title}</span>
+                              {prompt.isSystem && !prompt.isEdited && (
+                                <Badge variant="secondary" className="text-xs">Default</Badge>
+                              )}
+                              {prompt.isEdited && (
+                                <Badge variant="outline" className="text-xs">Edited</Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                              {prompt.content}
+                            </p>
+                          </div>
+                          <div className="flex gap-1 shrink-0">
+                            {prompt.isEdited && prompt.systemPromptId && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => handleResetPrompt(prompt)}
+                                title="Reset to default"
+                              >
+                                <RotateCcw className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => {
+                                setEditingPrompt(prompt);
+                                setPromptTitle(prompt.title);
+                                setPromptContent(prompt.content);
+                                setPromptDialogOpen(true);
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            {/* Only show delete for user's custom prompts */}
+                            {prompt.userId && !prompt.isSystem && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive"
+                                onClick={() => handleDeletePrompt(prompt.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
             {/* Context Graph Tab */}
             <TabsContent value="context">
               <div className="space-y-6">
@@ -1176,6 +1436,57 @@ export default function SettingsPage() {
               disabled={!memoryContent.trim()}
             >
               {editingMemory ? "Update" : "Add"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Prompt Dialog */}
+      <Dialog open={promptDialogOpen} onOpenChange={setPromptDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {editingPrompt ? "Edit Prompt" : "Add Prompt"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingPrompt
+                ? "Update this prompt template"
+                : "Create a new prompt template. Use {{variable}} for placeholders."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="promptTitle">Title</Label>
+              <Input
+                id="promptTitle"
+                placeholder="e.g., Compare items"
+                value={promptTitle}
+                onChange={(e) => setPromptTitle(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="promptContent">Prompt Content</Label>
+              <Textarea
+                id="promptContent"
+                placeholder="e.g., Compare {{item_A}} with {{item_B}} and highlight the key differences."
+                value={promptContent}
+                onChange={(e) => setPromptContent(e.target.value)}
+                rows={4}
+              />
+              <p className="text-xs text-muted-foreground">
+                Use {"{{variable_name}}"} for placeholders that users can fill in
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPromptDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={editingPrompt ? handleUpdatePrompt : handleAddPrompt}
+              disabled={!promptTitle.trim() || !promptContent.trim()}
+            >
+              {editingPrompt ? "Update" : "Add"}
             </Button>
           </DialogFooter>
         </DialogContent>

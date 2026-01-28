@@ -100,7 +100,7 @@ export const DEFAULT_MEMORY_CONFIG: MemoryConfig = {
   memoryEnabled: true,
   referenceSavedMemories: true,
   referenceChatHistory: true,
-  autoSaveMemories: false,
+  autoSaveMemories: true,
   memoryExtractionMode: 'balanced',
   maxMemoriesInContext: 10,
   includeSessionSummaries: false,

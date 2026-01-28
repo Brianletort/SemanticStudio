@@ -25,6 +25,7 @@ import {
   getResolvedModeConfig,
   DEFAULT_MODE_CONFIGS,
   createClarificationAgent,
+  createResearchFollowUpAgent,
   type ChatMode,
   type AgentEvent,
   type ModeClassification,
@@ -32,6 +33,7 @@ import {
   type ModeSettingsOverrides,
   type MemoryTierConfig,
   type PipelineConfig,
+  type ConversationMessage,
 } from "@/lib/chat";
 import { v4 as uuidv4 } from "uuid";
 import { isValidUUID } from "@/lib/utils";
@@ -340,6 +342,60 @@ export async function POST(request: NextRequest) {
       `RefHistory: ${memoryConfig.referenceChatHistory}, AutoSave: ${memoryConfig.autoSaveMemories}, ` +
       `Mode: ${memoryConfig.memoryExtractionMode}, Max: ${memoryConfig.maxMemoriesInContext}`);
 
+    // ============================================
+    // RESEARCH FOLLOW-UP DETECTION
+    // For research mode, detect if this is a follow-up and enhance the query
+    // ============================================
+    let effectiveSearchQuery = message;
+    let isResearchFollowUp = false;
+    let followUpAnalysis: { originalQuery: string; followUpIntent: string; enhancedQuery: string } | null = null;
+    
+    if (mode === 'research' && sessionId) {
+      try {
+        // Fetch conversation history for this session
+        const conversationHistory = await db
+          .select({ role: messagesTable.role, content: messagesTable.content })
+          .from(messagesTable)
+          .where(eq(messagesTable.sessionId, sessionId))
+          .orderBy(messagesTable.createdAt)
+          .limit(20);  // Get recent history
+        
+        if (conversationHistory.length > 0) {
+          const followUpAgent = createResearchFollowUpAgent();
+          const historyMessages: ConversationMessage[] = conversationHistory.map(m => ({
+            role: m.role as 'user' | 'assistant' | 'system',
+            content: m.content,
+          }));
+          
+          const analysis = await followUpAgent.analyzeFollowUp(message, historyMessages);
+          
+          if (analysis.isFollowUp) {
+            isResearchFollowUp = true;
+            effectiveSearchQuery = analysis.enhancedQuery;
+            followUpAnalysis = {
+              originalQuery: analysis.originalQuery,
+              followUpIntent: analysis.followUpIntent,
+              enhancedQuery: analysis.enhancedQuery,
+            };
+            
+            await emitEvent({
+              type: 'research_followup_detected',
+              originalQuery: analysis.originalQuery,
+              followUpIntent: analysis.followUpIntent,
+              enhancedQuery: analysis.enhancedQuery,
+              confidence: analysis.confidence,
+            });
+            
+            console.log(`[Research] Follow-up detected. Original: "${analysis.originalQuery.substring(0, 50)}...", Intent: "${analysis.followUpIntent}"`);
+            console.log(`[Research] Enhanced query: "${analysis.enhancedQuery.substring(0, 100)}..."`);
+          }
+        }
+      } catch (error) {
+        console.error('[Research] Follow-up detection failed:', error);
+        // Continue with original message if detection fails
+      }
+    }
+
     // Map chat mode to retrieval mode
     const retrievalMode: RetrievalMode = mode as RetrievalMode;
     
@@ -355,7 +411,8 @@ export async function POST(request: NextRequest) {
     });
 
     try {
-      const retrieval = await domainRetriever.retrieve(message, retrievalMode);
+      // Use effectiveSearchQuery for research follow-ups, otherwise use original message
+      const retrieval = await domainRetriever.retrieve(effectiveSearchQuery, retrievalMode);
       retrievalContext = retrieval.context;
       retrievalMetrics = retrieval.metrics;
       
@@ -406,12 +463,13 @@ export async function POST(request: NextRequest) {
       
       await emitEvent({
         type: 'web_search_started',
-        query: message.substring(0, 200),
+        query: effectiveSearchQuery.substring(0, 200),
         maxResults: webResultCount,
       });
       
       try {
-        const webResults = await braveSearch(message, webResultCount);
+        // Use effectiveSearchQuery for research follow-ups, otherwise use original message
+        const webResults = await braveSearch(effectiveSearchQuery, webResultCount);
         webSearchContext = formatSearchResultsForContext(webResults);
         
         const webSearchDuration = Date.now() - webSearchStartTime;
@@ -423,13 +481,33 @@ export async function POST(request: NextRequest) {
         });
         
         console.log(`[WebSearch] Found ${webResults.length} results in ${webSearchDuration}ms (mode: ${mode})`);
+        
+        // Log warning if no results found
+        if (webResults.length === 0) {
+          await emitEvent({
+            type: 'log',
+            level: 'warning',
+            agentId: 'web_search',
+            message: `Web search returned 0 results for query: "${effectiveSearchQuery.substring(0, 100)}"`,
+          });
+        }
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         console.error("Web search error:", error);
+        
+        const webSearchDuration = Date.now() - webSearchStartTime;
+        await emitEvent({
+          type: 'web_search_complete',
+          resultsCount: 0,
+          urls: [],
+          durationMs: webSearchDuration,
+        });
+        
         await emitEvent({
           type: 'log',
           level: 'error',
           agentId: 'web_search',
-          message: `Web search failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          message: `Web search failed: ${errorMessage}`,
         });
         // Continue without web search context if it fails
       }
@@ -484,10 +562,14 @@ export async function POST(request: NextRequest) {
         }
       }
       
-      // Only ask clarification questions if this is NOT an answer to previous clarification
+      // Only ask clarification questions if:
+      // - NOT an answer to previous clarification
+      // - NOT a follow-up to existing research (follow-ups should proceed directly)
       const clarificationResult = isAnswerToClarification 
         ? { shouldClarify: false, questions: [], originalQuery: message, skipReason: 'User answered clarification questions' }
-        : await clarificationAgent.analyze(message);
+        : isResearchFollowUp
+          ? { shouldClarify: false, questions: [], originalQuery: message, skipReason: 'Follow-up to existing research session' }
+          : await clarificationAgent.analyze(message);
       
       if (clarificationResult.shouldClarify) {
         // Emit clarification requested event
@@ -554,8 +636,16 @@ export async function POST(request: NextRequest) {
             .join('\n')}`
         : '';
       
+      // Build follow-up context if this is a research follow-up
+      const followUpContext = isResearchFollowUp && followUpAnalysis
+        ? `\n## Research Follow-up Context\nThis is a follow-up to an existing research session.\n- Original question: "${followUpAnalysis.originalQuery}"\n- User now wants: ${followUpAnalysis.followUpIntent}\n- Focus your research on the follow-up aspect while building on previous findings.`
+        : '';
+      
       // Build research input with context
-      const researchInput = `${message}
+      // Use enhanced query for follow-ups, original message otherwise
+      const researchQuery = isResearchFollowUp ? effectiveSearchQuery : message;
+      const researchInput = `${researchQuery}
+${followUpContext}
 ${clarificationContext}
 ${retrievalContext ? `\n## Available Data Context\n${retrievalContext}` : ''}
 ${memoryContextText ? `\n## User Context\n${memoryContextText}` : ''}`;
@@ -578,8 +668,27 @@ Include citations and sources for all findings.`,
 
         // Create streaming response for polling loop
         const encoder = new TextEncoder();
+        let streamCancelled = false;
+        
         const researchStream = new ReadableStream({
+          cancel() {
+            console.log("[Research] Stream cancelled by client");
+            streamCancelled = true;
+          },
           async start(controller) {
+            // Helper to safely enqueue data, returns false if stream is closed
+            const safeEnqueue = (data: string): boolean => {
+              if (streamCancelled) return false;
+              try {
+                controller.enqueue(encoder.encode(data));
+                return true;
+              } catch {
+                streamCancelled = true;
+                console.log("[Research] Stream closed, stopping research polling");
+                return false;
+              }
+            };
+            
             try {
               // Send mode info
               if (modeClassification) {
@@ -589,14 +698,14 @@ Include citations and sources for all findings.`,
                   runId,
                   turnId,
                 });
-                controller.enqueue(encoder.encode(`data: ${modeData}\n\n`));
+                if (!safeEnqueue(`data: ${modeData}\n\n`)) return;
               }
 
               // Send collected events
               if (collectedEvents.length > 0) {
                 for (const event of collectedEvents) {
                   const eventData = JSON.stringify({ type: 'agent', event });
-                  controller.enqueue(encoder.encode(`data: ${eventData}\n\n`));
+                  if (!safeEnqueue(`data: ${eventData}\n\n`)) return;
                 }
               }
 
@@ -605,7 +714,7 @@ Include citations and sources for all findings.`,
                 type: 'content', 
                 content: '🔬 **Starting Deep Research**\n\nI\'m conducting comprehensive research on your query. This may take several minutes...\n\n' 
               });
-              controller.enqueue(encoder.encode(`data: ${startMsg}\n\n`));
+              if (!safeEnqueue(`data: ${startMsg}\n\n`)) return;
 
               // Poll for completion (up to 30 minutes)
               const maxPolls = 360; // 30 minutes with 5 second intervals
@@ -615,6 +724,12 @@ Include citations and sources for all findings.`,
               const researchStartTime = Date.now();
 
               for (let i = 0; i < maxPolls; i++) {
+                // Check if stream was cancelled before polling
+                if (streamCancelled) {
+                  console.log("[Research] Stream cancelled, stopping research polling");
+                  break;
+                }
+                
                 await new Promise(resolve => setTimeout(resolve, pollInterval));
                 
                 const status = await getDeepResearchStatus(researchJob.id);
@@ -635,7 +750,7 @@ Include citations and sources for all findings.`,
                 
                 // Stream progress event to frontend
                 const progressEventData = JSON.stringify({ type: 'agent', event: progressEvent });
-                controller.enqueue(encoder.encode(`data: ${progressEventData}\n\n`));
+                if (!safeEnqueue(`data: ${progressEventData}\n\n`)) break;
 
                 // Stream progress updates to user
                 if (status.sourcesFound && status.sourcesFound > lastSourcesFound) {
@@ -643,7 +758,7 @@ Include citations and sources for all findings.`,
                     type: 'content', 
                     content: `📚 Found ${status.sourcesFound} sources...\n` 
                   });
-                  controller.enqueue(encoder.encode(`data: ${progressMsg}\n\n`));
+                  if (!safeEnqueue(`data: ${progressMsg}\n\n`)) break;
                   lastSourcesFound = status.sourcesFound;
                 }
 
@@ -670,11 +785,11 @@ Include citations and sources for all findings.`,
                   
                   // Stream complete event to frontend
                   const completeEventData = JSON.stringify({ type: 'agent', event: completeEvent });
-                  controller.enqueue(encoder.encode(`data: ${completeEventData}\n\n`));
+                  if (!safeEnqueue(`data: ${completeEventData}\n\n`)) break;
 
                   // Stream the final report
                   const divider = JSON.stringify({ type: 'content', content: '\n\n---\n\n# Research Report\n\n' });
-                  controller.enqueue(encoder.encode(`data: ${divider}\n\n`));
+                  if (!safeEnqueue(`data: ${divider}\n\n`)) break;
                   
                   if (status.output_text) {
                     // Stream in chunks for better UX
@@ -682,7 +797,7 @@ Include citations and sources for all findings.`,
                     for (let j = 0; j < status.output_text.length; j += chunkSize) {
                       const chunk = status.output_text.slice(j, j + chunkSize);
                       const chunkData = JSON.stringify({ type: 'content', content: chunk });
-                      controller.enqueue(encoder.encode(`data: ${chunkData}\n\n`));
+                      if (!safeEnqueue(`data: ${chunkData}\n\n`)) break;
                     }
                   }
 
@@ -695,28 +810,40 @@ Include citations and sources for all findings.`,
                     type: 'content', 
                     content: `\n\n❌ Research ${status.status}. Please try again with a more specific query.` 
                   });
-                  controller.enqueue(encoder.encode(`data: ${errorMsg}\n\n`));
+                  safeEnqueue(`data: ${errorMsg}\n\n`);
                   break;
                 }
               }
 
-              // Send evaluation trigger
-              const evalData = JSON.stringify({ type: 'evaluation', turnId, runId });
-              controller.enqueue(encoder.encode(`data: ${evalData}\n\n`));
-
-              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-              controller.close();
+              // Send evaluation trigger and close stream
+              if (!streamCancelled) {
+                const evalData = JSON.stringify({ type: 'evaluation', turnId, runId });
+                safeEnqueue(`data: ${evalData}\n\n`);
+                safeEnqueue("data: [DONE]\n\n");
+                try {
+                  controller.close();
+                } catch {
+                  // Controller already closed
+                }
+              }
               
               await eventBus.shutdown();
             } catch (error) {
               console.error("Research streaming error:", error);
-              const errorData = JSON.stringify({ 
-                type: 'content',
-                content: "Sorry, there was an error during research." 
-              });
-              controller.enqueue(encoder.encode(`data: ${errorData}\n\n`));
-              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-              controller.close();
+              
+              // Only try to send error response if controller is still open
+              try {
+                const errorData = JSON.stringify({ 
+                  type: 'content',
+                  content: "Sorry, there was an error during research." 
+                });
+                controller.enqueue(encoder.encode(`data: ${errorData}\n\n`));
+                controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                controller.close();
+              } catch (closeError) {
+                // Controller already closed (client disconnected), ignore
+                console.log("[Research] Client disconnected, controller already closed");
+              }
               
               await eventBus.shutdown();
             }

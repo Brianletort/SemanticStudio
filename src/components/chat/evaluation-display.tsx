@@ -44,6 +44,7 @@ export function EvaluationDisplay({
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [attempts, setAttempts] = useState(0);
+  const [pending, setPending] = useState(false);
   const pollingRef = useRef<boolean>(false);
   const maxAttemptsRef = useRef<number>(0);
 
@@ -62,10 +63,10 @@ export function EvaluationDisplay({
 
     let pollAttempts = 0;
     
-    // Mode-aware polling configuration
+    // Mode-aware polling configuration (increased for reliability)
     const pollingConfig = {
-      quick: { maxAttempts: 10, pollInterval: 1500, initialDelay: 500 },
-      think: { maxAttempts: 20, pollInterval: 2000, initialDelay: 1000 },
+      quick: { maxAttempts: 15, pollInterval: 2000, initialDelay: 1000 },
+      think: { maxAttempts: 25, pollInterval: 2500, initialDelay: 1500 },
       deep: { maxAttempts: 40, pollInterval: 2500, initialDelay: 2000 },
       research: { maxAttempts: 60, pollInterval: 3000, initialDelay: 3000 },
     };
@@ -104,7 +105,7 @@ export function EvaluationDisplay({
         if (pollAttempts >= maxAttempts) {
           pollingRef.current = false;
           setLoading(false);
-          // Don't show error - evaluation might just not be available
+          setPending(true); // Show pending state instead of hiding
         } else {
           setTimeout(pollForEvaluation, pollInterval);
         }
@@ -171,6 +172,13 @@ export function EvaluationDisplay({
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin" />
             <span>Evaluating response quality... ({attempts}/{maxAttemptsRef.current})</span>
+          </div>
+        )}
+
+        {pending && !evaluation && !error && !loading && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Clock className="w-4 h-4" />
+            <span>Evaluation pending...</span>
           </div>
         )}
 
